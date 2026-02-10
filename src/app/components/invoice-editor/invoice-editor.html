@@ -1,0 +1,309 @@
+<div class="overlay-backdrop">
+    <div class="split-container">
+
+        <!-- Mobile Toggle (visible on small screens) -->
+        <div class="mobile-toggle">
+            <button mat-button [class.active]="mobileViewMode() === 'edit'"
+                (click)="mobileViewMode.set('edit')">
+                <mat-icon>edit</mat-icon>
+                {{ 'INVOICE.EDIT' | translate }}
+            </button>
+            <button mat-button [class.active]="mobileViewMode() === 'preview'"
+                (click)="mobileViewMode.set('preview')">
+                <mat-icon>preview</mat-icon>
+                {{ 'INVOICE.PREVIEW' | translate }}
+            </button>
+        </div>
+
+        <!-- LEFT: Editor Panel -->
+        <div class="editor-panel" [class.mobile-hidden]="mobileViewMode() === 'preview'">
+            <div class="panel-header">
+                <h3>{{ 'INVOICE.LAYOUT' | translate }}</h3>
+                <div class="header-controls">
+                    <button mat-icon-button (click)="close.emit()" [title]="'COMMON.CLOSE' | translate">
+                        <mat-icon>close</mat-icon>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <button mat-stroked-button (click)="addText()">
+                    <mat-icon>add</mat-icon> {{ 'COMMON.ADD_TEXT' | translate }}
+                </button>
+                <button mat-stroked-button (click)="addImage()">
+                    <mat-icon>image</mat-icon> {{ 'COMMON.ADD_IMAGE' | translate }}
+                </button>
+            </div>
+
+            <div class="scrollable-content">
+                <div class="settings-row">
+                    <mat-form-field subscriptSizing="dynamic" class="currency-select">
+                        <mat-select [ngModel]="currency()" (selectionChange)="updateCurrency($event.value)"
+                            [matTooltip]="'COMMON.CURRENCY' | translate">
+                            @for (c of currencies; track c) {
+                            <mat-option [value]="c">{{c}}</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                    <mat-form-field subscriptSizing="dynamic" class="currency-select">
+                        <mat-select [ngModel]="paperSize()" (selectionChange)="updatePaperSize($event.value)"
+                            [matTooltip]="'COMMON.PAPER_SIZE' | translate">
+                            @for (s of paperSizes; track s) {
+                            <mat-option [value]="s">{{s}}</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                </div>
+
+                <p class="hint">{{ 'COMMON.DRAG_HINT' | translate }}</p>
+
+                <div class="taxes-panel">
+                    <div class="taxes-header" (click)="taxesPanelExpanded.set(!taxesPanelExpanded())">
+                        <div class="taxes-title">
+                            <mat-icon class="expand-icon" [class.expanded]="taxesPanelExpanded()">chevron_right</mat-icon>
+                            <h4>{{ 'TAXES.TITLE' | translate }}</h4>
+                            <span class="tax-count" *ngIf="taxes().length > 0">({{taxes().length}})</span>
+                        </div>
+                        <button mat-icon-button (click)="$event.stopPropagation(); addTax()" [title]="'TAXES.ADD' | translate">
+                            <mat-icon>add</mat-icon>
+                        </button>
+                    </div>
+
+                    @if (taxesPanelExpanded()) {
+                    @if (taxes().length === 0) {
+                    <p class="taxes-empty">{{ 'TAXES.EMPTY' | translate }}</p>
+                    } @else {
+                    <div class="taxes-list">
+                        @for (tax of taxes(); track tax.id) {
+                        <div class="tax-card">
+                            <div class="tax-card-header">
+                                <mat-form-field class="tax-name-field">
+                                    <mat-label>{{ 'TAXES.NAME' | translate }}</mat-label>
+                                    <input matInput [ngModel]="tax.name"
+                                        (ngModelChange)="updateTax(tax, { name: $event })">
+                                </mat-form-field>
+                                <button mat-icon-button color="warn" (click)="removeTax(tax)">
+                                    <mat-icon>delete</mat-icon>
+                                </button>
+                            </div>
+                            <div class="tax-card-body">
+                                <mat-form-field>
+                                    <mat-label>{{ 'TAXES.TYPE' | translate }}</mat-label>
+                                    <mat-select [ngModel]="tax.type"
+                                        (selectionChange)="updateTax(tax, { type: $event.value })">
+                                        @for (type of taxTypes; track type.value) {
+                                        <mat-option [value]="type.value">{{ type.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'TAXES.VALUE' | translate }}</mat-label>
+                                    <input matInput type="number" [ngModel]="tax.value"
+                                        (ngModelChange)="updateTax(tax, { value: $event })">
+                                </mat-form-field>
+
+                                <mat-slide-toggle [checked]="tax.enabled"
+                                    (change)="updateTax(tax, { enabled: $event.checked })">
+                                    {{ 'TAXES.ENABLED' | translate }}
+                                </mat-slide-toggle>
+                            </div>
+                        </div>
+                        }
+                    </div>
+                    }
+                    }
+                </div>
+
+                <div cdkDropList class="layout-list" (cdkDropListDropped)="drop($event)">
+                    @for (item of layout(); track item) {
+                    <div class="layout-item" cdkDrag>
+                        <div class="item-header">
+                            <div class="drag-handle" cdkDragHandle>
+                                <mat-icon>drag_indicator</mat-icon>
+                            </div>
+                            <div class="item-info">
+                                <span class="item-label">{{ (item.label || item.type) | translate }}</span>
+                                <span class="item-type">({{ item.type }})</span>
+                            </div>
+                            <div class="item-actions">
+                                <mat-slide-toggle [checked]="item.visible" (change)="toggleVisibility(item)"
+                                    color="primary" [matTooltip]="'COMMON.TOGGLE_VISIBILITY' | translate">
+                                </mat-slide-toggle>
+                                @if (isRemovable(item)) {
+                                <button mat-icon-button color="warn" (click)="remove(item)">
+                                    <mat-icon>delete</mat-icon>
+                                </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Content Editor inside the item card -->
+                        @if (isEditable(item)) {
+                        <div class="item-body">
+                            @if (item.type === 'text' || item.type === 'header') {
+                            <mat-form-field class="full-width">
+                                <mat-label>{{ 'INVOICE.TEXT_CONTENT' | translate }}</mat-label>
+                                <textarea matInput [ngModel]="displayContent(item)"
+                                    (ngModelChange)="updateContent(item, $event)" rows="4"></textarea>
+                            </mat-form-field>
+
+                            <div class="style-grid">
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.FONT_SIZE' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'fontSize', getDefaultTextStyle(item, 'fontSize'))"
+                                        (selectionChange)="updateStyle(item, 'fontSize', $event.value)">
+                                        @for (size of textSizes; track size) {
+                                        <mat-option [value]="size">{{ size }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.FONT_WEIGHT' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'fontWeight', getDefaultTextStyle(item, 'fontWeight'))"
+                                        (selectionChange)="updateStyle(item, 'fontWeight', $event.value)">
+                                        @for (weight of textWeights; track weight.value) {
+                                        <mat-option [value]="weight.value">{{ weight.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.TEXT_ALIGN' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'textAlign', getDefaultTextStyle(item, 'textAlign'))"
+                                        (selectionChange)="updateStyle(item, 'textAlign', $event.value)">
+                                        @for (alignment of textAlignments; track alignment.value) {
+                                        <mat-option [value]="alignment.value">{{ alignment.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.TEXT_STYLE' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'fontStyle', getDefaultTextStyle(item, 'fontStyle'))"
+                                        (selectionChange)="updateStyle(item, 'fontStyle', $event.value)">
+                                        @for (style of textStyles; track style.value) {
+                                        <mat-option [value]="style.value">{{ style.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.TEXT_DECORATION' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'textDecoration', getDefaultTextStyle(item, 'textDecoration'))"
+                                        (selectionChange)="updateStyle(item, 'textDecoration', $event.value)">
+                                        @for (decoration of textDecorations; track decoration.value) {
+                                        <mat-option [value]="decoration.value">{{ decoration.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.TEXT_COLOR' | translate }}</mat-label>
+                                    <input matInput type="color" class="color-input"
+                                        [ngModel]="getStyle(item, 'color', getDefaultTextStyle(item, 'color'))"
+                                        (ngModelChange)="updateStyle(item, 'color', $event)">
+                                </mat-form-field>
+                            </div>
+                            }
+
+                            @if (item.type === 'image') {
+                            <div class="image-toolbar">
+                                <button mat-stroked-button (click)="addImages(item)">
+                                    <mat-icon>add_photo_alternate</mat-icon>
+                                    {{ 'INVOICE.IMAGE_PICK' | translate }}
+                                </button>
+                                <button mat-button color="warn" (click)="clearImages(item)"
+                                    [disabled]="imageSources(item).length === 0">
+                                    <mat-icon>delete</mat-icon>
+                                    {{ 'INVOICE.IMAGE_CLEAR' | translate }}
+                                </button>
+                            </div>
+
+                            <div class="image-list" *ngIf="imageSources(item).length > 0; else emptyImages">
+                                @for (source of imageSources(item); track source; let i = $index) {
+                                <div class="image-list-item">
+                                    <span class="image-path" [title]="source">{{ source }}</span>
+                                    <button mat-icon-button color="warn" (click)="removeImage(item, i)">
+                                        <mat-icon>close</mat-icon>
+                                    </button>
+                                </div>
+                                }
+                            </div>
+                            <ng-template #emptyImages>
+                                <p class="image-empty">{{ 'INVOICE.IMAGE_EMPTY' | translate }}</p>
+                            </ng-template>
+
+                            <div class="style-grid">
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.IMAGE_FIT' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'imageFit', getDefaultImageStyle('imageFit'))"
+                                        (selectionChange)="updateStyle(item, 'imageFit', $event.value)">
+                                        @for (fit of imageFits; track fit.value) {
+                                        <mat-option [value]="fit.value">{{ fit.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.IMAGE_ALIGN' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'imageAlign', getDefaultImageStyle('imageAlign'))"
+                                        (selectionChange)="updateStyle(item, 'imageAlign', $event.value)">
+                                        @for (alignment of imageAlignments; track alignment.value) {
+                                        <mat-option [value]="alignment.value">{{ alignment.labelKey | translate }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.IMAGE_WIDTH' | translate }}</mat-label>
+                                    <input matInput [ngModel]="getStyle(item, 'imageWidth', getDefaultImageStyle('imageWidth'))"
+                                        (ngModelChange)="updateStyle(item, 'imageWidth', $event)" placeholder="100%">
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.IMAGE_HEIGHT' | translate }}</mat-label>
+                                    <input matInput [ngModel]="getStyle(item, 'imageHeight', getDefaultImageStyle('imageHeight'))"
+                                        (ngModelChange)="updateStyle(item, 'imageHeight', $event)" placeholder="200px">
+                                </mat-form-field>
+
+                                <mat-form-field>
+                                    <mat-label>{{ 'INVOICE.IMAGES_PER_ROW' | translate }}</mat-label>
+                                    <mat-select [ngModel]="getStyle(item, 'imagePerRow', getDefaultImageStyle('imagePerRow'))"
+                                        (selectionChange)="updateStyle(item, 'imagePerRow', $event.value)">
+                                        @for (count of imagePerRowOptions; track count) {
+                                        <mat-option [value]="count">{{ count }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+                            }
+                        </div>
+                        }
+                    </div>
+                    }
+                </div>
+            </div>
+
+            <div class="actions">
+                <button mat-button color="warn" (click)="reset()">{{ 'COMMON.RESET' | translate }}</button>
+                <button mat-raised-button color="primary" (click)="close.emit()">{{ 'COMMON.DONE' | translate }}</button>
+            </div>
+        </div>
+
+        <!-- RIGHT: Live Preview -->
+        <div class="preview-panel" [class.mobile-hidden]="mobileViewMode() === 'edit'">
+            <div class="preview-header">
+                <h3>{{ 'INVOICE.LIVE_PREVIEW' | translate }}</h3>
+                <span class="badge">{{paperSize()}} {{ 'COMMON.MODE' | translate }}</span>
+            </div>
+            <div class="preview-content">
+                <app-invoice-renderer [layout]="layout()" [invoiceItems]="invoiceItems()"
+                    [currencyCode]="currency()" [paperSize]="paperSize()" [taxes]="taxes()">
+                </app-invoice-renderer>
+            </div>
+        </div>
+
+    </div>
+</div>

@@ -1,0 +1,75 @@
+.theme-switch {
+  position: relative;
+  display: flex;
+  background: rgba(var(--window-fg-color-rgb), 0.08);
+  border-radius: 99px;
+  padding: 4px;
+  height: 40px;
+  width: 116px;
+  box-sizing: border-box;
+  align-items: center;
+
+  .switch-indicator {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: 36px;
+    height: 32px;
+    background: var(--window-bg-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 99px;
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 1;
+    pointer-events: none; // Prevent blocking clicks
+
+    &.light {
+      transform: translateX(0);
+    }
+    &.system {
+      transform: translateX(36px);
+    }
+    &.dark {
+      transform: translateX(72px);
+    }
+  }
+
+  .theme-btn {
+    position: relative;
+    z-index: 2;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    height: 32px;
+    width: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 99px;
+    transition: color 0.2s ease; // Faster than indicator transition
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      line-height: 1; // Critical for centering
+      display: block; // Changed from flex
+      // Fix Material Icons built-in offset
+      transform: translateY(
+        -0.5px
+      ); // Adjust this value as needed (try 0, -1px, -0.5px)
+    }
+
+    &.active {
+      color: var(--primary-color);
+    }
+
+    &:hover:not(.active) {
+      color: var(--window-fg-color);
+    }
+  }
+}

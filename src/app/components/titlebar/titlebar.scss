@@ -1,0 +1,74 @@
+.titlebar {
+  height: var(--titlebar-height);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding-left: var(--space-4);
+  user-select: none;
+  font-family: "Inter", sans-serif;
+
+  .title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+
+  .window-controls {
+    display: flex;
+    -webkit-app-region: no-drag;
+    height: 100%;
+
+    .lang-btn {
+      width: auto !important;
+      padding: 0 var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+
+      .lang-text {
+        margin-left: 4px;
+      }
+    }
+
+    button {
+      width: 48px;
+      height: 100%;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      border-radius: 0;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      &:hover {
+        background: var(--bg-surface-hover);
+        color: var(--text-primary);
+      }
+
+      &.close-btn:hover {
+        background: var(--color-danger);
+        color: white;
+      }
+    }
+  }
+}

@@ -7,7 +7,7 @@ const DB_NAME: &str = "app.db";
 
 pub fn init_db(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Initializing database...");
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     if !app_dir.exists() {
         fs::create_dir_all(&app_dir)?;
     }
@@ -73,7 +73,7 @@ pub fn get_product_by_code(
     app_handle: tauri::AppHandle,
     code: String,
 ) -> Result<Option<Product>, String> {
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     let db_path = app_dir.join(DB_NAME);
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -144,7 +144,7 @@ pub fn add_product(
         unit,
         images.len()
     );
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     let db_path = app_dir.join(DB_NAME);
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -183,7 +183,7 @@ pub fn update_product(
     images: Vec<ProductImage>,
 ) -> Result<(), String> {
     log::info!("Updating product: {} ({}) unit: {}", name, code, unit);
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     let db_path = app_dir.join(DB_NAME);
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -229,7 +229,7 @@ pub fn update_product(
 
 #[tauri::command]
 pub fn get_all_products(app_handle: tauri::AppHandle) -> Result<Vec<Product>, String> {
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     let db_path = app_dir.join(DB_NAME);
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -293,7 +293,7 @@ pub fn save_product_image(
     app_handle: tauri::AppHandle,
     file_path: String,
 ) -> Result<String, String> {
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     let images_dir = app_dir.join("product_images");
 
     if !images_dir.exists() {
@@ -315,7 +315,7 @@ pub fn save_product_image(
 
 #[tauri::command]
 pub fn get_setting(app_handle: tauri::AppHandle, key: String) -> Result<Option<String>, String> {
-    let app_dir = app_handle.path().app_data_dir().unwrap();
+    let app_dir = app_handle.path().app_config_dir().unwrap();
     let db_path = app_dir.join(DB_NAME);
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 

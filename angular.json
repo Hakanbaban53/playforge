@@ -1,62 +1,70 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
-  "newProjectRoot": "projects",
   "cli": {
-    "analytics": false
+    "packageManager": "npm"
   },
+  "newProjectRoot": "projects",
   "projects": {
-    "parkman": {
+    "playforge": {
       "projectType": "application",
-      "root": "",
-      "sourceRoot": "src",
-      "prefix": "app",
       "schematics": {
         "@schematics/angular:component": {
           "style": "scss"
         }
       },
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular-devkit/build-angular:application",
+          "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/parkman",
-            "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
-            "assets": ["src/assets"],
+            "inlineStyleLanguage": "scss",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
+              }
+            ],
             "styles": [
-              "@angular/material/prebuilt-themes/indigo-pink.css",
               "src/styles.scss"
             ],
-            "scripts": []
+            "allowedCommonJsDependencies": [
+              "xlsx",
+              "jspdf",
+              "html2canvas",
+              "canvg",
+              "raf",
+              "rgbcolor",
+              "core-js"
+            ]
           },
           "configurations": {
             "production": {
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "2mb",
-                  "maximumError": "4mb"
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kb",
-                  "maximumError": "9kb"
+                  "maximumWarning": "16kB",
+                  "maximumError": "32kB"
                 }
               ],
               "outputHashing": "all"
             },
             "development": {
-              "optimization": {
-              "scripts": true,
-              "styles": {
-                "minify": true,
-                "inlineCritical": false
-              },
-              "fonts": false
-            },
+              "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
             }
@@ -64,19 +72,19 @@
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular-devkit/build-angular:dev-server",
-          "options": {
-            "port": 1420
-          },
+          "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "parkman:build:production"
+              "buildTarget": "playforge:build:production"
             },
             "development": {
-              "buildTarget": "parkman:build:development"
+              "buildTarget": "playforge:build:development"
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
         }
       }
     }

@@ -1,0 +1,331 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'catalogMgmt.title' | translate }}</h1>
+      <p class="muted">{{ 'catalogMgmt.subtitle' | translate }}</p>
+    </div>
+    <app-button variant="primary" size="md" (click)="startAddFamily()">
+      <app-icon name="add" [size]="14" />
+      {{ 'catalogMgmt.addFamily' | translate }}
+    </app-button>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error">
+      <app-icon name="warning" [size]="14" />
+      {{ error() }}
+    </div>
+  }
+
+  <div class="layout">
+    <!-- ===================== Families list ===================== -->
+    <aside class="families-list surface-card">
+      <h3 class="list-title">{{ 'catalogMgmt.families' | translate }}</h3>
+
+      @if (families().length === 0) {
+        <div class="empty-mini">
+          <app-icon name="sell" [size]="24" />
+          <p>{{ 'catalogMgmt.noFamilies' | translate }}</p>
+        </div>
+      } @else {
+        <div class="family-items">
+          @for (fam of families(); track fam.id) {
+            <button
+              type="button"
+              class="family-card"
+              [class.family-card--active]="selectedFamilyId() === fam.id"
+              (click)="selectFamily(fam.id)"
+            >
+              <div class="family-card__code mono">{{ fam.code }}</div>
+              <div class="family-card__name">{{ fam.name }}</div>
+              <div class="family-card__meta">
+                <span>{{ 'category.' + fam.category | translate }}</span>
+                <span class="dot">·</span>
+                <span>{{ 'catalog.partsCount' | translate: { count: fam.availableParts.length } }}</span>
+              </div>
+            </button>
+          }
+        </div>
+      }
+    </aside>
+
+    <!-- ===================== Editor pane ===================== -->
+    <div class="editor-pane">
+      @if (draftMode() === 'family') {
+        <!-- Family editor -->
+        <section class="surface-card form-card">
+          <h3 class="form-card__title">
+            {{ editingId() ? ('common.edit' | translate) : ('catalogMgmt.addFamily' | translate) }}
+          </h3>
+
+          <div class="form-grid">
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.familyName' | translate }}</span>
+              <input [value]="fName()" (input)="set(fName, $event)" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.familyCode' | translate }}</span>
+              <input [value]="fCode()" (input)="set(fCode, $event)" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'common.category' | translate }}</span>
+              <select [value]="fCategory()" (change)="setProductCategory($event)">
+                @for (cat of productCategories; track cat) {
+                  <option [value]="cat">{{ 'category.' + cat | translate }}</option>
+                }
+              </select>
+            </label>
+            <label class="f-field">
+              <span>{{ 'common.currency' | translate }}</span>
+              <select [value]="fCurrency()" (change)="setCurrency($event)">
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="TRY">TRY</option>
+              </select>
+            </label>
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.ageRange' | translate }}</span>
+              <input [value]="fAgeRange()" (input)="set(fAgeRange, $event)" placeholder="3-12 yrs" />
+            </label>
+            <label class="f-field f-field--full">
+              <span>{{ 'catalogMgmt.tags' | translate }}</span>
+              <input [value]="fTags()" (input)="set(fTags, $event)" placeholder="outdoor, modular" />
+            </label>
+            <label class="f-field f-field--full">
+              <span>{{ 'common.description' | translate }}</span>
+              <textarea rows="3" [value]="fDescription()" (input)="set(fDescription, $event)"></textarea>
+            </label>
+            <label class="f-field f-field--full">
+              <span>{{ 'catalogMgmt.images' | translate }} (URL, {{ 'common.primary' | translate }} first)</span>
+              <textarea rows="2" [value]="fImages()" (input)="set(fImages, $event)" placeholder="https://..."></textarea>
+            </label>
+            <label class="f-field f-field--full">
+              <span>{{ 'catalogMgmt.uploadImage' | translate }}</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                [disabled]="isUploading()"
+                (change)="onImageUpload($event)"
+              />
+              @if (isUploading()) { <span class="muted small">{{ 'common.loading' | translate }}</span> }
+            </label>
+            @if (uploadError()) {
+              <div class="alert alert--error">{{ uploadError() }}</div>
+            }
+          </div>
+
+          <div class="form-actions">
+            <app-button variant="ghost" size="md" (click)="cancelDraft()">{{ 'common.cancel' | translate }}</app-button>
+            <app-button variant="primary" size="md" (click)="saveFamily()">{{ 'common.save' | translate }}</app-button>
+          </div>
+        </section>
+      }
+
+      @if (draftMode() === 'none' && selectedFamily(); as fam) {
+        <!-- Selected family details -->
+        <section class="surface-card detail-card">
+          <div class="detail-card__head">
+            <div>
+              <div class="detail-card__code mono">{{ fam.code }}</div>
+              <h2>{{ fam.name }}</h2>
+              <div class="detail-card__meta">
+                <span class="chip">{{ 'category.' + fam.category | translate }}</span>
+                @if (fam.ageRange) { <span class="chip">{{ fam.ageRange }}</span> }
+                <span class="chip">{{ fam.currency }}</span>
+                @for (tag of fam.tags; track tag) { <span class="chip chip--muted">{{ tag }}</span> }
+              </div>
+            </div>
+            <div class="detail-card__actions">
+              <app-button variant="secondary" size="sm" (click)="startEditFamily(fam)">
+                <app-icon name="settings" [size]="14" />
+                {{ 'common.edit' | translate }}
+              </app-button>
+              <app-button variant="danger" size="sm" (click)="deleteFamily(fam)">
+                <app-icon name="delete" [size]="14" />
+                {{ 'common.delete' | translate }}
+              </app-button>
+            </div>
+          </div>
+
+          @if (fam.description) {
+            <p class="muted detail-card__desc">{{ fam.description }}</p>
+          }
+        </section>
+
+        <!-- Variants section -->
+        <section class="surface-card detail-card">
+          <div class="section-head">
+            <h3>{{ 'catalogMgmt.variants' | translate }} ({{ variants().length }})</h3>
+            <app-button variant="secondary" size="sm" (click)="startAddVariant()">
+              <app-icon name="add" [size]="14" />
+              {{ 'catalogMgmt.addVariant' | translate }}
+            </app-button>
+          </div>
+
+          @if (variants().length === 0) {
+            <p class="muted small">{{ 'catalogMgmt.noVariants' | translate }}</p>
+          } @else {
+            <div class="variants-list">
+              @for (v of variants(); track v.id) {
+                <div class="variant-row">
+                  <div class="variant-row__main">
+                    <div class="variant-row__label">{{ v.label }}</div>
+                    <div class="variant-row__sku mono">{{ v.sku }}</div>
+                  </div>
+                  <div class="variant-row__size">{{ variantSize(v) }}</div>
+                  <div class="variant-row__price">{{ variantPrice(v) | money: fam.currency }}</div>
+                  <div class="variant-row__status">
+                    @if (v.active) {
+                      <span class="status-dot status-dot--ok"></span>
+                    } @else {
+                      <span class="status-dot status-dot--off"></span>
+                    }
+                  </div>
+                  <div class="variant-row__actions">
+                    <button class="icon-btn" (click)="startEditVariant(v)" [title]="'common.edit' | translate">
+                      <app-icon name="settings" [size]="14" />
+                    </button>
+                    <button class="icon-btn icon-btn--danger" (click)="deleteVariant(v)" [title]="'common.delete' | translate">
+                      <app-icon name="delete" [size]="14" />
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <!-- Parts section -->
+        <section class="surface-card detail-card">
+          <div class="section-head">
+            <h3>{{ 'catalogMgmt.parts' | translate }} ({{ fam.availableParts.length }})</h3>
+            <app-button variant="secondary" size="sm" (click)="startAddPart()">
+              <app-icon name="add" [size]="14" />
+              {{ 'catalogMgmt.addPart' | translate }}
+            </app-button>
+          </div>
+
+          @if (fam.availableParts.length === 0) {
+            <p class="muted small">{{ 'catalogMgmt.noParts' | translate }}</p>
+          } @else {
+            <div class="parts-list">
+              @for (p of fam.availableParts; track p.id) {
+                <div class="part-row">
+                  <div class="part-row__main">
+                    <div class="part-row__name">
+                      {{ p.name }}
+                      @if (p.required) { <span class="req-tag">{{ 'common.required' | translate }}</span> }
+                    </div>
+                    <div class="part-row__sku mono">{{ p.sku }}</div>
+                    @if (p.description) { <div class="part-row__desc muted">{{ p.description }}</div> }
+                  </div>
+                  <div class="part-row__cat">{{ 'partCategory.' + p.category | translate }}</div>
+                  <div class="part-row__price">{{ p.price | money: fam.currency }}</div>
+                  <div class="part-row__actions">
+                    <button class="icon-btn" (click)="startEditPart(p)" [title]="'common.edit' | translate">
+                      <app-icon name="settings" [size]="14" />
+                    </button>
+                    <button class="icon-btn icon-btn--danger" (click)="deletePart(p)" [title]="'common.delete' | translate">
+                      <app-icon name="delete" [size]="14" />
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+
+      @if (draftMode() === 'variant') {
+        <!-- Variant editor -->
+        <section class="surface-card form-card">
+          <h3 class="form-card__title">
+            {{ editingId() ? ('common.edit' | translate) : ('catalogMgmt.addVariant' | translate) }}
+          </h3>
+
+          <div class="form-grid">
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.variantLabel' | translate }}</span>
+              <input [value]="fVariantLabel()" (input)="set(fVariantLabel, $event)" placeholder="5m" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.variantSku' | translate }}</span>
+              <input [value]="fVariantSku()" (input)="set(fVariantSku, $event)" placeholder="TWR-5M" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'common.size' | translate }}</span>
+              <input [value]="fVariantSize()" (input)="set(fVariantSize, $event)" placeholder="5m" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'common.price' | translate }}</span>
+              <input type="number" min="0" step="0.01" [value]="fVariantPrice()" (input)="setNum(fVariantPrice, $event)" />
+            </label>
+            <label class="f-field f-field--inline">
+              <input type="checkbox" [checked]="fVariantActive()" (change)="setBool(fVariantActive, $event)" />
+              <span>{{ 'catalogMgmt.active' | translate }}</span>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <app-button variant="ghost" size="md" (click)="cancelDraft()">{{ 'common.cancel' | translate }}</app-button>
+            <app-button variant="primary" size="md" (click)="saveVariant()">{{ 'common.save' | translate }}</app-button>
+          </div>
+        </section>
+      }
+
+      @if (draftMode() === 'part') {
+        <!-- Part editor -->
+        <section class="surface-card form-card">
+          <h3 class="form-card__title">
+            {{ editingId() ? ('common.edit' | translate) : ('catalogMgmt.addPart' | translate) }}
+          </h3>
+
+          <div class="form-grid">
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.partName' | translate }}</span>
+              <input [value]="fPartName()" (input)="set(fPartName, $event)" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.partSku' | translate }}</span>
+              <input [value]="fPartSku()" (input)="set(fPartSku, $event)" />
+            </label>
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.partCategory' | translate }}</span>
+              <select [value]="fPartCategory()" (change)="setPartCategory($event)">
+                @for (cat of partCategories; track cat) {
+                  <option [value]="cat">{{ 'partCategory.' + cat | translate }}</option>
+                }
+              </select>
+            </label>
+            <label class="f-field">
+              <span>{{ 'catalogMgmt.partPrice' | translate }}</span>
+              <input type="number" min="0" step="0.01" [value]="fPartPrice()" (input)="setNum(fPartPrice, $event)" />
+            </label>
+            <label class="f-field f-field--inline">
+              <input type="checkbox" [checked]="fPartRequired()" (change)="setBool(fPartRequired, $event)" />
+              <span>{{ 'catalogMgmt.partRequired' | translate }}</span>
+            </label>
+            <label class="f-field f-field--full">
+              <span>{{ 'catalogMgmt.partDesc' | translate }}</span>
+              <textarea rows="2" [value]="fPartDesc()" (input)="set(fPartDesc, $event)"></textarea>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <app-button variant="ghost" size="md" (click)="cancelDraft()">{{ 'common.cancel' | translate }}</app-button>
+            <app-button variant="primary" size="md" (click)="savePart()">{{ 'common.save' | translate }}</app-button>
+          </div>
+        </section>
+      }
+
+      @if (draftMode() === 'none' && !selectedFamily()) {
+        <div class="empty-state surface-card">
+          <app-icon name="sell" [size]="40" />
+          <h3>{{ 'catalogMgmt.noFamilies' | translate }}</h3>
+          <p class="muted">{{ 'catalogMgmt.subtitle' | translate }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>

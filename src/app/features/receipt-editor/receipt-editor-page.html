@@ -1,0 +1,322 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'receipt.title' | translate }}</h1>
+      <p class="muted">{{ 'receipt.subtitle' | translate }}</p>
+    </div>
+    <div class="head-actions">
+      <app-button variant="ghost" size="md" (click)="goBack()">
+        <app-icon name="arrow_back" [size]="14" />
+        {{ 'common.back' | translate }}
+      </app-button>
+      <app-button variant="secondary" size="md" (click)="resetLayout()">
+        <app-icon name="restart_alt" [size]="14" />
+        {{ 'receipt.resetLayout' | translate }}
+      </app-button>
+    </div>
+  </header>
+
+  <!-- Add element toolbar -->
+  <div class="add-toolbar surface-card">
+    <span class="add-toolbar__label">{{ 'receipt.addElement' | translate }}:</span>
+    <app-button variant="secondary" size="sm" (click)="addElement('header')">
+      <app-icon name="description" [size]="14" />
+      {{ 'receipt.addHeader' | translate }}
+    </app-button>
+    <app-button variant="secondary" size="sm" (click)="addElement('text')">
+      <app-icon name="info" [size]="14" />
+      {{ 'receipt.addText' | translate }}
+    </app-button>
+    <app-button variant="secondary" size="sm" (click)="addElement('image')">
+      <app-icon name="image" [size]="14" />
+      {{ 'receipt.addImage' | translate }}
+    </app-button>
+    <app-button variant="secondary" size="sm" (click)="addElement('totals')">
+      <app-icon name="sell" [size]="14" />
+      {{ 'receipt.addTotals' | translate }}
+    </app-button>
+    <app-button variant="secondary" size="sm" (click)="addElement('divider')">
+      <app-icon name="remove" [size]="14" />
+      {{ 'receipt.addDivider' | translate }}
+    </app-button>
+  </div>
+
+  <div class="layout">
+    <!-- ===================== Editor: layout list ===================== -->
+    <div class="editor-pane">
+      <div class="pane-head">
+        <h2>{{ 'receipt.layout' | translate }}</h2>
+        <span class="muted small">{{ 'receipt.dragToReorder' | translate }}</span>
+      </div>
+
+      <div cdkDropList class="layout-list" (cdkDropListDropped)="onDrop($event)">
+        @for (el of layout(); track el.id) {
+          <div
+            class="layout-item" role="button" tabindex="0"
+            [class.layout-item--selected]="selectedId() === el.id"
+            [class.layout-item--hidden]="!el.visible"
+            cdkDrag
+            (click)="selectElement(el.id)"
+          >
+            <div class="layout-item__handle" cdkDragHandle>
+              <app-icon name="grid_view" [size]="14" />
+            </div>
+
+            <div class="layout-item__icon">
+              <app-icon [name]="elementIcon(el.type)" [size]="16" />
+            </div>
+
+            <div class="layout-item__label">
+              {{ el.labelKey ? (el.labelKey | translate) : el.id }}
+              @if (!el.visible) {
+                <span class="layout-item__hidden-tag">{{ 'receipt.elementHidden' | translate }}</span>
+              }
+            </div>
+
+            <button
+              type="button"
+              class="icon-btn"
+              (click)="toggleVisibility(el.id); $event.stopPropagation()"
+              [title]="'receipt.toggleVisibility' | translate"
+            >
+              <app-icon [name]="el.visible ? 'check' : 'close'" [size]="14" />
+            </button>
+
+            @if (isRemovable(el)) {
+              <button
+                type="button"
+                class="icon-btn icon-btn--danger"
+                (click)="removeElement(el.id); $event.stopPropagation()"
+                [title]="'receipt.removeElement' | translate"
+              >
+                <app-icon name="delete" [size]="14" />
+              </button>
+            } @else {
+              <span class="icon-btn-spacer" [title]="'receipt.cannotRemoveFixed' | translate">·</span>
+            }
+          </div>
+        }
+      </div>
+
+      @if (uploadError()) {
+        <div class="alert alert--error">
+          <app-icon name="warning" [size]="14" />
+          {{ uploadError() }}
+        </div>
+      }
+
+      <!-- Per-element editor (only when an element is selected) -->
+      @if (selectedId(); as id) {
+        @if (layout().find(e => e.id === id); as el) {
+          <div class="element-editor surface-card">
+            <h3>{{ el.labelKey ? (el.labelKey | translate) : el.id }}</h3>
+
+            @if (isContentEditable(el)) {
+              <label class="e-field">
+                <span>{{ el.type === 'image' ? ('receipt.imageSources' | translate) : ('receipt.textContent' | translate) }}</span>
+                <textarea
+                  rows="4"
+                  [value]="el.content || ''"
+                  (input)="updateContent(el.id, $event)"
+                ></textarea>
+              </label>
+
+              @if (el.type === 'image') {
+                <label class="e-field e-field--file">
+                  <span>{{ 'receipt.uploadImage' | translate }}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    [disabled]="uploadingFor() === el.id"
+                    (change)="onImageUpload(el, $event)"
+                  />
+                  @if (uploadingFor() === el.id) {
+                    <span class="muted small">{{ 'common.loading' | translate }}</span>
+                  }
+                </label>
+
+                @if (imageSources(el).length > 0) {
+                  <div class="e-preview">
+                    @for (src of imageSources(el); track src; let i = $index) {
+                      <div class="e-preview__item">
+                        <app-resolved-img [src]="src" [styles]="{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--surface-200)' }" alt="" />
+                        <button
+                          type="button"
+                          class="e-preview__remove"
+                          (click)="removeImage(el, i)"
+                          [attr.aria-label]="'common.remove' | translate"
+                        >×</button>
+                      </div>
+                    }
+                  </div>
+                }
+              }
+            }
+
+            @if (isTextStylable(el)) {
+              <div class="e-styles">
+                <!-- Font size stepper: arbitrary px value via +/- buttons -->
+                <label class="e-field">
+                  <span>{{ 'receipt.fontSize' | translate }}</span>
+                  <div class="stepper">
+                    <button
+                      type="button"
+                      (click)="bumpFontSize(el, -1)"
+                      [title]="'receipt.fontSizeDecrease' | translate"
+                      aria-label="decrease"
+                    >−</button>
+                    <input
+                      type="text"
+                      [value]="getStyle(el, 'fontSize', el.type === 'header' ? '20px' : '14px')"
+                      (input)="updateStyle(el.id, 'fontSize', $event)"
+                    />
+                    <button
+                      type="button"
+                      (click)="bumpFontSize(el, 1)"
+                      [title]="'receipt.fontSizeIncrease' | translate"
+                      aria-label="increase"
+                    >+</button>
+                  </div>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.fontWeight' | translate }}</span>
+                  <select [value]="getStyle(el, 'fontWeight', '400')" (change)="updateStyle(el.id, 'fontWeight', $event)">
+                    @for (w of textWeights; track w.value) {
+                      <option [value]="w.value">{{ w.key | translate }}</option>
+                    }
+                  </select>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.textAlign' | translate }}</span>
+                  <select [value]="getStyle(el, 'textAlign', 'left')" (change)="updateStyle(el.id, 'textAlign', $event)">
+                    @for (a of textAlignments; track a.value) {
+                      <option [value]="a.value">{{ a.key | translate }}</option>
+                    }
+                  </select>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.color' | translate }}</span>
+                  <input
+                    type="color"
+                    [value]="getStyle(el, 'color', '#111827')"
+                    (input)="updateStyle(el.id, 'color', $event)"
+                  />
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.lineHeight' | translate }}</span>
+                  <input
+                    type="text"
+                    [value]="getStyle(el, 'lineHeight', '1.4')"
+                    (input)="updateStyle(el.id, 'lineHeight', $event)"
+                  />
+                </label>
+
+                <label class="e-field e-field--inline">
+                  <input
+                    type="checkbox"
+                    [checked]="getStyle(el, 'fontStyle', 'normal') === 'italic'"
+                    (change)="toggleStyle(el.id, 'fontStyle', 'italic', 'normal', $event)"
+                  />
+                  <span>{{ 'receipt.italic' | translate }}</span>
+                </label>
+
+                <label class="e-field e-field--inline">
+                  <input
+                    type="checkbox"
+                    [checked]="getStyle(el, 'textDecoration', 'none') === 'underline'"
+                    (change)="toggleStyle(el.id, 'textDecoration', 'underline', 'none', $event)"
+                  />
+                  <span>{{ 'receipt.underline' | translate }}</span>
+                </label>
+              </div>
+            }
+
+            @if (isImageStylable(el)) {
+              <div class="e-styles">
+                <label class="e-field">
+                  <span>{{ 'receipt.imageFit' | translate }}</span>
+                  <select [value]="getStyle(el, 'imageFit', 'contain')" (change)="updateStyle(el.id, 'imageFit', $event)">
+                    @for (f of imageFits; track f.value) {
+                      <option [value]="f.value">{{ f.key | translate }}</option>
+                    }
+                  </select>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.imageWidth' | translate }}</span>
+                  <select [value]="getStyle(el, 'imageWidth', '100%')" (change)="updateStyle(el.id, 'imageWidth', $event)">
+                    <option value="100%">{{ 'receipt.widthFull' | translate }}</option>
+                    <option value="75%">{{ 'receipt.width75' | translate }}</option>
+                    <option value="50%">{{ 'receipt.width50' | translate }}</option>
+                    <option value="33%">{{ 'receipt.width33' | translate }}</option>
+                    <option value="25%">{{ 'receipt.width25' | translate }}</option>
+                    <option value="auto">{{ 'receipt.widthAuto' | translate }}</option>
+                    <option value="150px">150px</option>
+                    <option value="200px">200px</option>
+                    <option value="300px">300px</option>
+                    <option value="400px">400px</option>
+                  </select>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.imageHeight' | translate }}</span>
+                  <select [value]="getStyle(el, 'imageHeight', '200px')" (change)="updateStyle(el.id, 'imageHeight', $event)">
+                    <option value="100px">100px</option>
+                    <option value="150px">150px</option>
+                    <option value="200px">200px</option>
+                    <option value="300px">300px</option>
+                    <option value="400px">400px</option>
+                    <option value="500px">500px</option>
+                    <option value="auto">{{ 'receipt.heightAuto' | translate }}</option>
+                  </select>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.imageRadius' | translate }}</span>
+                  <select [value]="getStyle(el, 'imageRadius', '0px')" (change)="updateStyle(el.id, 'imageRadius', $event)">
+                    <option value="0px">{{ 'receipt.radiusNone' | translate }}</option>
+                    <option value="4px">4px</option>
+                    <option value="8px">8px</option>
+                    <option value="12px">12px</option>
+                    <option value="16px">16px</option>
+                    <option value="50%">{{ 'receipt.radiusRound' | translate }}</option>
+                  </select>
+                </label>
+
+                <label class="e-field">
+                  <span>{{ 'receipt.imagePerRow' | translate }}</span>
+                  <select [value]="getStyle(el, 'imagePerRow', el.type === 'visuals' ? '3' : '1')" (change)="updateStyle(el.id, 'imagePerRow', $event)">
+                    @for (n of imagePerRowOptions; track n) {
+                      <option [value]="n">{{ n }}</option>
+                    }
+                  </select>
+                </label>
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+
+    <!-- ===================== Live preview ===================== -->
+    <aside class="preview-pane">
+      <div class="pane-head">
+        <h2>{{ 'receipt.preview' | translate }}</h2>
+        <span class="muted small">{{ active().meta.paperSize }}</span>
+      </div>
+
+      <div class="preview-scroll">
+        <app-receipt-preview
+          [invoice]="active()"
+          [layout]="layout()"
+          [paperSize]="active().meta.paperSize"
+        />
+      </div>
+    </aside>
+  </div>
+</section>

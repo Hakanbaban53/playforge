@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "parkman",
+  "productName": "PlayForge",
   "version": "0.1.0",
-  "identifier": "com.parkman.app",
+  "identifier": "com.playforge.app",
   "build": {
-    "beforeDevCommand": "npm run start",
+    "beforeDevCommand": "npm run start -- --port 1420",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist/parkman/browser"
+    "frontendDist": "../dist/playforge/browser"
   },
   "app": {
     "security": {
@@ -20,7 +20,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "targets": ["nsis", "msi"],
     "windows": {
       "wix": {
         "bannerPath": "icons/wix-banner.bmp",
@@ -30,7 +31,7 @@
         "headerImage": "icons/nsis-header.bmp",
         "sidebarImage": "icons/nsis-sidebar.bmp",
         "installerIcon": "icons/icon.ico",
-        "startMenuFolder": "ParkMan",
+        "startMenuFolder": "PlayForge",
         "compression": "lzma"
       }
     },
@@ -41,5 +42,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Hakanbaban53/PlayForge/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwREQ4ODk2Rjk0NjgzM0IKUldRN2cwYjVsb2pkc0g1bUYwU3BGdmU0NlVzdUk4dk1EUWpzK1dFR0QwcE11VVEyNmFtaDlBMnQK"
+    }
   }
 }

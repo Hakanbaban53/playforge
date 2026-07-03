@@ -1,0 +1,315 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'import.title' | translate }}</h1>
+      <p class="muted">{{ 'import.subtitle' | translate }}</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Step 1: Download template -->
+    <div class="step surface-card">
+      <div class="step__num">1</div>
+      <div class="step__body">
+        <h3>{{ 'import.step1Title' | translate }}</h3>
+        <p class="muted">{{ 'import.step1Desc' | translate }}</p>
+        <app-button variant="secondary" size="md" (click)="downloadTemplate()">
+          <app-icon name="download" [size]="16" />
+          {{ 'import.downloadTemplate' | translate }}
+        </app-button>
+
+        @if (downloadMessage()) {
+          <div class="alert alert--success">
+            <app-icon name="check" [size]="16" />
+            {{ downloadMessage() }}
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Step 2: Upload -->
+    <div
+      class="step surface-card dropzone"
+      [class.dropzone--drag]="isDragging()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
+    >
+      <div class="step__num">2</div>
+      <div class="step__body">
+        <h3>{{ 'import.uploadTitle' | translate }}</h3>
+        <p class="muted">{{ 'import.step2Desc' | translate }}</p>
+
+        @if (isParsing()) {
+          <div class="parsing-state">
+            <app-icon name="progress_activity" [size]="18" />
+            {{ 'import.parsing' | translate }}
+          </div>
+        }
+
+        <label class="file-picker">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            (change)="onFileSelected($event)"
+            [disabled]="isParsing()"
+          />
+          <span class="file-picker__label">{{ 'import.browse' | translate }}</span>
+        </label>
+
+        @if (errorMessage()) {
+          <div class="alert alert--error">
+            <app-icon name="warning" [size]="16" />
+            {{ errorMessage() }}
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Step 3: Validation results + Preview -->
+    @if (result()) {
+      <div class="step surface-card">
+        <div class="step__num">3</div>
+        <div class="step__body">
+          <h3>{{ 'import.validationResults' | translate }}</h3>
+
+          <div class="stats-row">
+            <div class="stat">
+              <span class="stat__value">{{ result()!.totalRows }}</span>
+              <span class="stat__label">{{ 'import.totalRows' | translate }}</span>
+            </div>
+            <div class="stat stat--ok">
+              <span class="stat__value">{{ result()!.valid.length }}</span>
+              <span class="stat__label">{{ 'import.valid' | translate }}</span>
+            </div>
+            <div class="stat stat--err">
+              <span class="stat__value">{{ result()!.invalid.length }}</span>
+              <span class="stat__label">{{ 'import.invalid' | translate }}</span>
+            </div>
+            <div class="stat stat--warn">
+              <span class="stat__value">{{ result()!.warnings.length }}</span>
+              <span class="stat__label">{{ 'import.warnings' | translate }}</span>
+            </div>
+          </div>
+
+          @if (result()!.errors.length > 0) {
+            <h4 class="error-list-title">{{ 'import.errors' | translate: { count: result()!.errors.length } }}</h4>
+            <div class="error-table">
+              @for (err of result()!.errors; track err.rowIndex + ':' + err.columnKey + ':' + $index) {
+                <div class="error-row error-row--error">
+                  <span class="error-row__row">Row {{ err.rowIndex }}</span>
+                  <span class="error-row__col">{{ err.columnKey | translate }}</span>
+                  <span class="error-row__msg">{{ err.messageKey | translate: err.messageParams }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (result()!.warnings.length > 0) {
+            <h4 class="error-list-title">{{ 'import.warnings' | translate: { count: result()!.warnings.length } }}</h4>
+            <div class="error-table">
+              @for (warn of result()!.warnings; track warn.rowIndex + ':' + warn.columnKey + ':' + $index) {
+                <div class="error-row error-row--warn">
+                  <span class="error-row__row">Row {{ warn.rowIndex }}</span>
+                  <span class="error-row__col">{{ warn.columnKey | translate }}</span>
+                  <span class="error-row__msg">{{ warn.messageKey | translate: warn.messageParams }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Preview table: what will happen -->
+          @if (preview() && preview()!.rows.length > 0) {
+            <h4 class="preview-title">{{ 'import.previewTitle' | translate }}</h4>
+
+            <!-- Summary badges -->
+            <div class="preview-summary">
+              @if (preview()!.newFamilies > 0) {
+                <span class="badge badge--create">{{ 'import.previewNewFamilies' | translate: { count: preview()!.newFamilies } }}</span>
+              }
+              @if (preview()!.updatedFamilies > 0) {
+                <span class="badge badge--update">{{ 'import.previewUpdatedFamilies' | translate: { count: preview()!.updatedFamilies } }}</span>
+              }
+              @if (preview()!.newVariants > 0) {
+                <span class="badge badge--create">{{ 'import.previewNewVariants' | translate: { count: preview()!.newVariants } }}</span>
+              }
+              @if (preview()!.updatedVariants > 0) {
+                <span class="badge badge--update">{{ 'import.previewUpdatedVariants' | translate: { count: preview()!.updatedVariants } }}</span>
+              }
+              @if (preview()!.conflicts > 0) {
+                <span class="badge badge--conflict">{{ 'import.previewConflicts' | translate: { count: preview()!.conflicts } }}</span>
+              }
+            </div>
+
+            <!-- Select all / deselect all -->
+            <div class="preview-actions">
+              <button type="button" class="link-btn" (click)="selectAll()">{{ 'import.selectAll' | translate }}</button>
+              <span class="muted small">·</span>
+              <button type="button" class="link-btn" (click)="deselectAll()">{{ 'import.deselectAll' | translate }}</button>
+              <span class="muted small">{{ 'import.selectedCount' | translate: { count: selectedCount() } }}</span>
+            </div>
+
+            <!-- Row-by-row preview -->
+            <div class="preview-table">
+              @for (row of preview()!.rows; track row.draft.rowIndex) {
+                <div
+                  class="preview-row" role="button" tabindex="0"
+                  [class.preview-row--conflict]="row.conflicts.length > 0"
+                  [class.preview-row--deselected]="!row.selected"
+                  (click)="toggleRow(row)"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="row.selected"
+                    (change)="toggleRow(row)"
+                    (click)="$event.stopPropagation()"
+                  />
+                  <span class="preview-row__action" [class]="'action--' + row.action">
+                    {{ actionLabel(row.action) | translate }}
+                  </span>
+                  <div class="preview-row__info">
+                    <div class="preview-row__name">{{ row.draft.familyName }}</div>
+                    <div class="preview-row__meta">
+                      <span class="mono">{{ row.draft.familyCode }}</span>
+                      <span class="dot">·</span>
+                      <span class="mono">{{ row.draft.variantSku }}</span>
+                      @if (row.draft.size) {
+                        <span class="dot">·</span>
+                        <span>{{ row.draft.size }}</span>
+                      }
+                      <span class="dot">·</span>
+                      <span>{{ row.draft.price }} {{ row.draft.currency }}</span>
+                    </div>
+                    @if (row.conflicts.length > 0) {
+                      <div class="preview-row__conflicts">
+                        @for (c of row.conflicts; track c) {
+                          <span class="conflict-chip">⚠ {{ conflictLabel(c) }}</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Mode selector -->
+          <div class="mode-selector">
+            <label class="mode-option">
+              <input
+                type="radio"
+                name="importMode"
+                value="merge"
+                [checked]="importMode() === 'merge'"
+                (change)="setMode('merge')"
+              />
+              <div class="mode-option__content">
+                <div class="mode-option__title">{{ 'import.modeMerge' | translate }}</div>
+                <div class="mode-option__desc">{{ 'import.modeMergeDesc' | translate }}</div>
+              </div>
+            </label>
+            <label class="mode-option">
+              <input
+                type="radio"
+                name="importMode"
+                value="replace"
+                [checked]="importMode() === 'replace'"
+                (change)="setMode('replace')"
+              />
+              <div class="mode-option__content">
+                <div class="mode-option__title">{{ 'import.modeReplace' | translate }}</div>
+                <div class="mode-option__desc">{{ 'import.modeReplaceDesc' | translate }}</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="apply-bar">
+            <app-button variant="ghost" size="md" (click)="reset()">
+              {{ 'import.startOver' | translate }}
+            </app-button>
+            <app-button
+              variant="primary"
+              size="md"
+              [disabled]="selectedCount() === 0"
+              (click)="applyImport()"
+            >
+              <app-icon name="check" [size]="16" />
+              {{ 'import.importSelected' | translate: { count: selectedCount() } }}
+            </app-button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Applied confirmation -->
+    @if (applied()) {
+      <div class="step surface-card confirm-card anim-scale-in">
+        <div class="confirm-icon">
+          <app-icon name="check" [size]="28" />
+        </div>
+        <div class="step__body">
+          <h3>{{ 'import.importComplete' | translate }}</h3>
+          <p class="muted">
+            @if (applied()!.created > 0 && applied()!.updated > 0) {
+              {{ 'import.mergedBoth' | translate: { created: applied()!.created, updated: applied()!.updated, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+            } @else if (applied()!.created > 0) {
+              {{ 'import.mergedCreated' | translate: { created: applied()!.created, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+            } @else if (applied()!.updated > 0) {
+              {{ 'import.mergedUpdated' | translate: { updated: applied()!.updated, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+            } @else {
+              {{ 'import.importedSummary' | translate: { families: applied()!.families, variants: applied()!.variants, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+            }
+          </p>
+          <app-button variant="secondary" size="md" (click)="reset()">
+            {{ 'import.importAnother' | translate }}
+          </app-button>
+        </div>
+      </div>
+    }
+
+    <!-- Format reference -->
+    <div class="step surface-card reference-card">
+      <div class="step__body">
+        <h3>{{ 'import.formatReference' | translate }}</h3>
+        <p class="muted">{{ 'import.formatReferenceDesc' | translate }}</p>
+
+        <table class="ref-table">
+          <thead>
+            <tr>
+              <th>{{ 'import.column' | translate }}</th>
+              <th>{{ 'import.format' | translate }}</th>
+              <th>{{ 'import.example' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ 'importColumns.parts' | translate }}</td>
+              <td><code>name|sku|category|price; name|sku|category|price</code></td>
+              <td><code>Tower|TWR-1|structure|920; Slide|SLD-3|slide|410</code></td>
+            </tr>
+            <tr>
+              <td>{{ 'importColumns.images' | translate }}</td>
+              <td><code>url; url; url</code></td>
+              <td><code>https://example.com/a.jpg; https://example.com/b.jpg</code></td>
+            </tr>
+            <tr>
+              <td>{{ 'importColumns.tags' | translate }}</td>
+              <td><code>tag1, tag2, tag3</code></td>
+              <td><code>outdoor, modular, inclusive</code></td>
+            </tr>
+            <tr>
+              <td>{{ 'importColumns.category' | translate }}</td>
+              <td>{{ 'import.oneOfValues' | translate }}</td>
+              <td><code>slide</code></td>
+            </tr>
+            <tr>
+              <td>{{ 'importColumns.currency' | translate }}</td>
+              <td>{{ 'import.isoCode' | translate }}</td>
+              <td><code>USD</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

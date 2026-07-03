@@ -1,0 +1,249 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'configurator.title' | translate }}</h1>
+      <p class="muted">
+        {{ 'configurator.subtitle' | translate }}
+      </p>
+    </div>
+  </header>
+
+  <!-- Family picker -->
+  @if (families().length > 0) {
+    <div class="family-bar">
+      @for (fam of families(); track fam.id) {
+        <button
+          type="button"
+          class="family-tile"
+          [class.family-tile--active]="family()?.id === fam.id"
+          (click)="selectFamily(fam.id)"
+        >
+          <span class="family-tile__code mono">{{ fam.code }}</span>
+          <span class="family-tile__name">{{ fam.name }}</span>
+          <span class="family-tile__meta">
+            {{ 'catalog.partsCount' | translate: { count: fam.availableParts.length } }} · {{ fam.currency }}
+          </span>
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="empty-state surface-card">
+      <app-icon name="inventory_2" [size]="40" />
+      <h3>{{ 'catalog.empty' | translate }}</h3>
+      <p class="muted">{{ 'catalog.emptyDesc' | translate }}</p>
+    </div>
+  }
+
+  @if (family()) {
+    <div class="layout">
+      <!-- Left: parts checklist -->
+      <div class="parts-pane surface-card">
+        <div class="parts-pane__head">
+          <div>
+            <h2>{{ family()?.name }}</h2>
+            <p class="muted">{{ family()?.description }}</p>
+          </div>
+          <div class="parts-pane__actions">
+            <app-button variant="ghost" size="sm" (click)="clearOptional()">
+              <app-icon name="restart_alt" [size]="14" />
+              {{ 'configurator.clearOptional' | translate }}
+            </app-button>
+            <app-button variant="ghost" size="sm" (click)="resetAll()">
+              <app-icon name="restart_alt" [size]="14" />
+              {{ 'common.reset' | translate }}
+            </app-button>
+          </div>
+        </div>
+
+        <div class="parts-groups">
+          @for (group of partsByCategory(); track group[0]) {
+            <section class="part-group">
+              <h3 class="part-group__title">
+                {{ 'partCategory.' + group[0] | translate }}
+                <span class="part-group__count">{{ group[1].length }}</span>
+              </h3>
+              <div class="part-group__items">
+                @for (part of group[1]; track part.id) {
+                  <label
+                    class="part-row"
+                    [class.part-row--selected]="isPartSelected(part.id)"
+                  >
+                    <input
+                      type="checkbox"
+                      [checked]="isPartSelected(part.id)"
+                      (change)="toggle(part.id)"
+                      [disabled]="part.required"
+                    />
+                    <span class="part-row__check" aria-hidden="true">
+                      @if (isPartSelected(part.id)) {
+                        <app-icon name="check" [size]="12" />
+                      }
+                    </span>
+
+                    <div class="part-row__main">
+                      <div class="part-row__name">
+                        {{ part.name }}
+                        @if (part.required) {
+                          <span class="part-row__required">{{ 'common.required' | translate }}</span>
+                        }
+                      </div>
+                      <div class="part-row__sku mono">{{ part.sku }}</div>
+                      @if (part.description) {
+                        <div class="part-row__desc muted">{{ part.description }}</div>
+                      }
+                    </div>
+
+                    <div class="part-row__right">
+                      <div class="part-row__price">
+                        {{ part.price | money: family()!.currency }}
+                      </div>
+
+                      @if (isPartSelected(part.id)) {
+                        <div class="qty-stepper" (click)="$event.stopPropagation()">
+                          <button type="button" (click)="decrement(part.id)" aria-label="Decrease quantity">
+                            <app-icon name="remove" [size]="12" />
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            [value]="selection().get(part.id) ?? 1"
+                            (input)="setQuantity(part.id, $event)"
+                            (click)="$event.stopPropagation()"
+                          />
+                          <button type="button" (click)="increment(part.id)" aria-label="Increase quantity">
+                            <app-icon name="add" [size]="12" />
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </label>
+                }
+              </div>
+            </section>
+          }
+        </div>
+      </div>
+
+      <!-- Right: summary & suggestion -->
+      <aside class="summary-pane">
+        @if (family()!.images.length > 0) {
+          <div class="hero surface-card">
+            <app-resolved-img
+              [src]="primaryImage(family()!.images)"
+              [alt]="family()!.name"
+              imgClass="hero__img"
+            />
+          </div>
+        }
+
+        <!-- Reverse-match suggestion -->
+        @if (exactMatch(); as exact) {
+          <div class="suggestion suggestion--exact surface-card anim-scale-in">
+            <div class="suggestion__icon">
+              <app-icon name="check" [size]="22" />
+            </div>
+            <div class="suggestion__body">
+              <div class="suggestion__title">{{ 'configurator.exactMatch' | translate }}</div>
+              <p class="muted">
+                {{ 'configurator.exactMatchDesc' | translate }}
+                <strong>{{ exact.product.name }}</strong>
+                ({{ exact.product.sku }}).
+              </p>
+            </div>
+            <app-button variant="primary" size="sm" (click)="useSuggestion()">
+              {{ 'configurator.useVariant' | translate }}
+            </app-button>
+          </div>
+        }
+        @if (partialMatch(); as partial) {
+          <div class="suggestion suggestion--partial surface-card anim-scale-in">
+            <div class="suggestion__icon">
+              <app-icon name="auto_awesome" [size]="22" />
+            </div>
+            <div class="suggestion__body">
+              <div class="suggestion__title">
+                {{ 'configurator.partialMatchTitle' | translate: { name: partial.product.name } }}
+              </div>
+              <p class="muted">
+                {{ 'configurator.partialMatchDesc' | translate: { sku: partial.product.sku } }}
+              </p>
+              @if (partial.missingSkus.length > 0) {
+                <p class="suggestion__diff">
+                  {{ 'configurator.missing' | translate }}
+                  @for (sku of partial.missingSkus; track sku) {
+                    <span class="diff-chip diff-chip--missing">{{ sku }}</span>
+                  }
+                </p>
+              }
+              @if (partial.extraSkus.length > 0) {
+                <p class="suggestion__diff">
+                  {{ 'configurator.extra' | translate }}
+                  @for (sku of partial.extraSkus; track sku) {
+                    <span class="diff-chip diff-chip--extra">{{ sku }}</span>
+                  }
+                </p>
+              }
+            </div>
+            <app-button variant="accent" size="sm" (click)="useSuggestion()">
+              {{ 'configurator.useVariant' | translate }}
+            </app-button>
+          </div>
+        }
+
+        <!-- Total -->
+        <div class="total-card surface-card">
+          <h3>{{ 'configurator.summary' | translate }}</h3>
+
+          @if (selectedPartsResolved().length === 0) {
+            <p class="muted">
+              {{ 'configurator.noPartsSelected' | translate }}
+            </p>
+          } @else {
+            <ul class="total-list">
+              @for (item of selectedPartsResolved(); track item.part.id) {
+                <li>
+                  <span class="total-list__qty">×{{ item.quantity }}</span>
+                  <span class="total-list__name">{{ item.part.name }}</span>
+                  <span class="total-list__amount mono">
+                    {{ (item.part.price * item.quantity) | money: family()!.currency }}
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+
+          <div class="total-divider"></div>
+          <div class="total-row">
+            <span>{{ 'common.total' | translate }}</span>
+            <span class="total-row__amount">
+              {{ totalPrice() | money: family()!.currency }}
+            </span>
+          </div>
+
+          @if (!requiredSatisfied()) {
+            <p class="total-warning">
+              <app-icon name="warning" [size]="14" />
+              {{ 'configurator.requiredMissing' | translate }}
+            </p>
+          }
+
+          <app-button
+            variant="primary"
+            size="lg"
+            [disabled]="!hasSelection() || !requiredSatisfied()"
+            (click)="addToInvoice()"
+          >
+            <app-icon name="shopping_cart" [size]="16" />
+            {{ 'configurator.addToInvoice' | translate }}
+          </app-button>
+        </div>
+      </aside>
+    </div>
+  } @else {
+    <div class="empty-state surface-card">
+      <app-icon name="inventory_2" [size]="40" />
+      <h3>{{ 'configurator.pickFamily' | translate }}</h3>
+      <p class="muted">{{ 'configurator.pickFamilyDesc' | translate }}</p>
+    </div>
+  }
+</section>

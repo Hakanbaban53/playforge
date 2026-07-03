@@ -1,0 +1,107 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'export.title' | translate }}</h1>
+      <p class="muted">{{ 'export.subtitle' | translate }}</p>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error">
+      <app-icon name="warning" [size]="14" />
+      {{ error() }}
+    </div>
+  }
+
+  @if (lastExport()) {
+    <div class="alert alert--success">
+      <app-icon name="check" [size]="14" />
+      {{ lastExport() }}
+    </div>
+  }
+
+  <div class="grid">
+    <!-- Catalog export with family selection -->
+    <div class="surface-card card card--wide">
+      <h3 class="card__title">{{ 'export.catalogTitle' | translate }}</h3>
+      <p class="muted small">{{ 'export.catalogDesc' | translate }}</p>
+
+      <!-- Family selection -->
+      @if (families().length > 0) {
+        <div class="family-select-head">
+          <label class="family-select-all">
+            <input
+              type="checkbox"
+              [checked]="selectAllFamilies()"
+              (change)="toggleSelectAll()"
+            />
+            <span>{{ 'export.selectAllFamilies' | translate }}</span>
+          </label>
+          <span class="muted small">
+            {{ 'export.exportingCount' | translate: { count: exportCount() } }}
+          </span>
+        </div>
+
+        <div class="family-select-list">
+          @for (fam of families(); track fam.id) {
+            <label class="family-select-row">
+              <input
+                type="checkbox"
+                [checked]="isFamilySelected(fam.code)"
+                (change)="toggleFamily(fam.code)"
+              />
+              <div class="family-select-row__info">
+                <div class="family-select-row__name">{{ fam.name }}</div>
+                <div class="family-select-row__code mono">{{ fam.code }}</div>
+              </div>
+            </label>
+          }
+        </div>
+
+        <div class="actions">
+          <app-button variant="primary" size="md" (click)="doCatalogExport('xlsx')" [disabled]="exportCount() === 0">
+            <app-icon name="download" [size]="14" />
+            {{ 'export.exportXlsx' | translate }}
+          </app-button>
+          <app-button variant="secondary" size="md" (click)="doCatalogExport('csv')" [disabled]="exportCount() === 0">
+            <app-icon name="download" [size]="14" />
+            {{ 'export.exportCsv' | translate }}
+          </app-button>
+        </div>
+      } @else {
+        <div class="empty-mini">
+          <app-icon name="sell" [size]="24" />
+          <p>{{ 'export.noFamilies' | translate }}</p>
+        </div>
+      }
+    </div>
+
+    <!-- Invoice export -->
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'export.invoicesTitle' | translate }}</h3>
+      <p class="muted small">{{ 'export.invoicesDesc' | translate }}</p>
+
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat__value">{{ savedInvoiceCount }}</span>
+          <span class="stat__label">{{ 'export.savedInvoices' | translate }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">{{ activeLineCount }}</span>
+          <span class="stat__label">{{ 'export.activeLines' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <app-button variant="primary" size="md" (click)="doInvoiceExport('xlsx')">
+          <app-icon name="download" [size]="14" />
+          {{ 'export.exportXlsx' | translate }}
+        </app-button>
+        <app-button variant="secondary" size="md" (click)="doInvoiceExport('csv')">
+          <app-icon name="download" [size]="14" />
+          {{ 'export.exportCsv' | translate }}
+        </app-button>
+      </div>
+    </div>
+  </div>
+</section>

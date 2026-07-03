@@ -1,0 +1,145 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'catalog.title' | translate }}</h1>
+      <p class="muted">{{ 'catalog.subtitle' | translate }}</p>
+    </div>
+
+    <div class="page__head-search">
+      <app-icon name="search" [size]="18" />
+      <input
+        type="search"
+        [placeholder]="'catalog.searchPlaceholder' | translate"
+        [value]="search()"
+        (input)="onSearchInput($event)"
+        [attr.aria-label]="'common.search' | translate"
+      />
+    </div>
+  </header>
+
+  @if (isEmpty()) {
+    <div class="empty-catalog surface-card">
+      <app-icon name="grid_view" [size]="44" />
+      <h2>{{ 'catalog.empty' | translate }}</h2>
+      <p class="muted">{{ 'catalog.emptyDesc' | translate }}</p>
+      <app-button variant="primary" size="md" (click)="goToManagement()">
+        <app-icon name="sell" [size]="14" />
+        {{ 'catalog.goToManagement' | translate }}
+      </app-button>
+    </div>
+  } @else {
+    <div class="layout">
+      <!-- Filters -->
+      <aside class="filters">
+        <h3 class="filters__title">{{ 'catalog.categories' | translate }}</h3>
+        <button
+          type="button"
+          class="filter-chip"
+          [class.filter-chip--active]="activeCategory() === null"
+          (click)="setCategory(null)"
+        >
+          {{ 'catalog.allCategories' | translate }}
+        </button>
+        @for (cat of categories; track cat) {
+          <button
+            type="button"
+            class="filter-chip"
+            [class.filter-chip--active]="activeCategory() === cat"
+            (click)="setCategory(cat)"
+          >
+            {{ 'category.' + cat | translate }}
+          </button>
+        }
+
+        <h3 class="filters__title">{{ 'catalog.families' | translate }}</h3>
+        @for (family of families(); track family.id) {
+          <div class="family-pill">
+            <div class="family-pill__name">{{ family.name }}</div>
+            <div class="family-pill__meta">
+              <span>{{ 'catalog.variants' | translate: { count: variantCount(family.id) } }}</span>
+              <span class="dot">·</span>
+              <span>{{ 'catalog.partsCount' | translate: { count: family.availableParts.length } }}</span>
+            </div>
+          </div>
+        }
+      </aside>
+
+      <!-- Grid -->
+      <div class="grid stagger">
+        @for (product of filtered(); track product.variantId) {
+          <article class="card surface-card">
+            <div class="card__media">
+              @if (primaryImage(product.images)) {
+                <app-resolved-img
+                  [src]="primaryImage(product.images)"
+                  [alt]="product.name"
+                  imgClass="card__media-img"
+                />
+              } @else {
+                <div class="card__media-placeholder">
+                  <app-icon name="image" [size]="32" />
+                  <span>{{ 'catalog.noImage' | translate }}</span>
+                </div>
+              }
+              <span class="card__size">{{ product.size ?? '—' }}</span>
+            </div>
+
+            <div class="card__body">
+              <div class="card__category">
+                {{ 'category.' + product.category | translate }}
+              </div>
+              <h3 class="card__name">{{ product.name }}</h3>
+              <div class="card__sku mono">{{ product.sku }}</div>
+
+              @if (product.tags.length > 0) {
+                <div class="card__tags">
+                  @for (tag of product.tags; track tag) {
+                    <span class="tag">{{ tag }}</span>
+                  }
+                </div>
+              }
+
+              <div class="card__parts">
+                <app-icon name="layers" [size]="14" />
+                <span>{{ 'catalog.configurableParts' | translate: { count: product.parts.length } }}</span>
+              </div>
+            </div>
+
+            <div class="card__footer">
+              <div class="card__price">
+                <span class="card__price-label">{{ 'catalog.from' | translate }}</span>
+                <span class="card__price-value">
+                  {{ product.price | money: product.currency }}
+                </span>
+              </div>
+              <div class="card__actions">
+                <app-button
+                  variant="secondary"
+                  size="sm"
+                  (click)="configure(product.variantId)"
+                >
+                  <app-icon name="settings" [size]="14" />
+                  {{ 'catalog.configure' | translate }}
+                </app-button>
+                <app-button
+                  variant="primary"
+                  size="sm"
+                  (click)="addToInvoice(product.variantId)"
+                >
+                  <app-icon name="shopping_cart" [size]="14" />
+                  {{ 'catalog.add' | translate }}
+                </app-button>
+              </div>
+            </div>
+          </article>
+        } @empty {
+          <div class="empty-state surface-card">
+            <app-icon name="search" [size]="36" />
+            <h3>{{ 'catalog.noMatches' | translate }}</h3>
+            <p class="muted">{{ 'catalog.noMatchesDesc' | translate }}</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</section>

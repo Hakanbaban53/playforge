@@ -1,0 +1,91 @@
+<div class="shell" [class.shell--mobile]="isMobile()" [class.shell--collapsed]="sidebarCollapsed() && !isMobile()">
+  @if (isMobile()) {
+    <header class="mobile-topbar">
+      <button type="button" class="mobile-topbar__hamburger" (click)="toggleSidebar()" aria-label="Toggle menu">
+        <app-icon name="menu" [size]="22" />
+      </button>
+      <span class="mobile-topbar__title">{{ title }}</span>
+      <span class="mobile-topbar__badge">
+        @if (lineCount() > 0) {
+          <app-icon name="shopping_cart" [size]="18" />
+          {{ lineCount() }}
+        }
+      </span>
+    </header>
+  }
+
+  @if (isMobile() && mobileDrawerOpen()) {
+    <div class="mobile-backdrop" (click)="closeBackdrop()"></div>
+  }
+
+  <aside
+    class="sidebar"
+    [class.sidebar--mobile-open]="isMobile() && mobileDrawerOpen()"
+    [class.sidebar--mobile-closed]="isMobile() && !mobileDrawerOpen()"
+  >
+    <!-- Brand area with hover-to-reveal collapse toggle -->
+    <div class="sidebar__brand-wrapper">
+      <div class="sidebar__brand" role="button" tabindex="0" (click)="!isMobile() && toggleSidebar()">
+        <div class="brand-mark">
+          <app-icon class="brand-mark__default" name="inventory_2" [size]="22" />
+          @if (!isMobile()) {
+            <app-icon
+              class="brand-mark__hover"
+              [name]="sidebarCollapsed() ? 'chevron_right' : 'chevron_left'"
+              [size]="20"
+            />
+          }
+        </div>
+        @if (showText()) {
+          <div class="brand-text">
+            <span class="brand-name">{{ title }}</span>
+            <span class="brand-sub">{{ 'app.subtitle' | translate }}</span>
+          </div>
+        }
+      </div>
+      @if (isMobile()) {
+        <button type="button" class="sidebar__close-btn" (click)="closeMobileDrawer()" aria-label="Close menu">
+          <app-icon name="close" [size]="20" />
+        </button>
+      }
+    </div>
+
+    <nav class="sidebar__nav">
+      @for (item of navItems; track item.route) {
+        <a
+          class="nav-item"
+          [routerLink]="item.route"
+          routerLinkActive="nav-item--active"
+          [title]="showText() ? '' : (item.labelKey | translate)"
+          (click)="closeMobileDrawer()"
+        >
+          <span class="nav-item__icon">
+            <app-icon [name]="item.icon" [size]="20" />
+          </span>
+          @if (showText()) {
+            <span class="nav-item__label">
+              <span class="nav-item__title">{{ item.labelKey | translate }}</span>
+              <span class="nav-item__desc">{{ item.descKey | translate }}</span>
+            </span>
+          }
+          @if (item.route === '/invoice' && lineCount() > 0) {
+            <span class="nav-item__badge">{{ lineCount() }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    @if (showText()) {
+      <div class="sidebar__footer">
+        <div class="version-pill">
+          <app-icon name="tag" [size]="14" />
+          <span>v0.1.0</span>
+        </div>
+      </div>
+    }
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

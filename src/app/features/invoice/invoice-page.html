@@ -1,0 +1,320 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'invoice.title' | translate }}</h1>
+      <p class="muted">
+        {{ 'invoice.subtitle' | translate }}
+      </p>
+    </div>
+    <div class="head-actions">
+      <app-button variant="secondary" size="md" (click)="openReceiptEditor()">
+        <app-icon name="layers" [size]="14" />
+        {{ 'invoice.openEditor' | translate }}
+      </app-button>
+      <app-button variant="ghost" size="md" (click)="clearAll()" [disabled]="active().lines.length === 0">
+        <app-icon name="delete" [size]="14" />
+        {{ 'invoice.clearLines' | translate }}
+      </app-button>
+      <app-button
+        variant="primary"
+        size="md"
+        (click)="downloadPdf()"
+        [loading]="isGeneratingPdf()"
+        [disabled]="active().lines.length === 0"
+      >
+        <app-icon name="download" [size]="16" />
+        {{ 'invoice.downloadPdf' | translate }}
+      </app-button>
+    </div>
+  </header>
+
+  @if (lastPageCount()) {
+    <div class="pdf-info">
+      <app-icon name="description" [size]="14" />
+      {{ 'invoice.pdfGenerated' | translate: { count: lastPageCount() } }}
+    </div>
+  }
+
+  @if (pdfError()) {
+    <div class="alert alert--error">
+      <app-icon name="warning" [size]="16" />
+      {{ pdfError() }}
+    </div>
+  }
+
+  <div class="layout">
+    <!-- ===================== Editor (left) ===================== -->
+    <div class="editor">
+      <!-- Customer & meta -->
+      <section class="surface-card card">
+        <h3 class="card__title">{{ 'invoice.details' | translate }}</h3>
+        <div class="form-grid">
+          <label class="field">
+            <span>{{ 'invoice.invoiceNumber' | translate }}</span>
+            <input
+              type="text"
+              [value]="active().meta.invoiceNumber"
+              (input)="updateMeta($event, 'invoiceNumber')"
+            />
+          </label>
+          <label class="field">
+            <span>{{ 'invoice.issueDate' | translate }}</span>
+            <input
+              type="date"
+              [value]="active().meta.issueDate"
+              (input)="updateMeta($event, 'issueDate')"
+            />
+          </label>
+          <label class="field">
+            <span>{{ 'invoice.dueDate' | translate }}</span>
+            <input
+              type="date"
+              [value]="active().meta.dueDate"
+              (input)="updateMeta($event, 'dueDate')"
+            />
+          </label>
+          <label class="field">
+            <span>{{ 'common.currency' | translate }}</span>
+            <select [value]="active().meta.currency" (change)="updateMeta($event, 'currency')">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="TRY">TRY</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>{{ 'invoice.paperSize' | translate }}</span>
+            <select [value]="active().meta.paperSize" (change)="updateMeta($event, 'paperSize')">
+              <option value="A4">A4</option>
+              <option value="A5">A5</option>
+              <option value="Letter">Letter</option>
+            </select>
+          </label>
+          <label class="field field--full">
+            <span>{{ 'invoice.customerName' | translate }}</span>
+            <input
+              type="text"
+              [placeholder]="'invoice.customerNamePlaceholder' | translate"
+              [value]="active().meta.customerName"
+              (input)="updateMeta($event, 'customerName')"
+            />
+          </label>
+          <label class="field">
+            <span>{{ 'invoice.email' | translate }}</span>
+            <input
+              type="email"
+              placeholder="buyer@acme.com"
+              [value]="active().meta.customerEmail || ''"
+              (input)="updateMeta($event, 'customerEmail')"
+            />
+          </label>
+          <label class="field">
+            <span>{{ 'invoice.taxId' | translate }}</span>
+            <input
+              type="text"
+              [value]="active().meta.customerTaxId || ''"
+              (input)="updateMeta($event, 'customerTaxId')"
+            />
+          </label>
+          <label class="field field--full">
+            <span>{{ 'invoice.customerAddress' | translate }}</span>
+            <textarea
+              rows="2"
+              [value]="active().meta.customerAddress || ''"
+              (input)="updateMeta($event, 'customerAddress')"
+            ></textarea>
+          </label>
+          <label class="field field--full">
+            <span>{{ 'invoice.sellerBlock' | translate }}</span>
+            <textarea
+              rows="3"
+              [value]="active().meta.seller"
+              (input)="updateMeta($event, 'seller')"
+            ></textarea>
+          </label>
+        </div>
+      </section>
+
+      <!-- Line items -->
+      <section class="surface-card card">
+        <div class="card__head">
+          <h3 class="card__title">{{ 'invoice.lineItems' | translate: { count: active().lines.length } }}</h3>
+        </div>
+
+        @if (active().lines.length === 0) {
+          <div class="empty-lines">
+            <app-icon name="shopping_cart" [size]="28" />
+            <p>{{ 'invoice.noLines' | translate }}</p>
+          </div>
+        } @else {
+          <div class="lines">
+            @for (line of active().lines; track line.id) {
+              <article class="line">
+                <div class="line__media">
+                  @if (line.imageUrl) {
+                    <app-resolved-img [src]="line.imageUrl" [alt]="line.name" imgClass="line__media-img" />
+                  } @else {
+                    <div class="line__media-empty">
+                      <app-icon name="image" [size]="18" />
+                    </div>
+                  }
+                </div>
+
+                <div class="line__main">
+                  <div class="line__head">
+                    <h4>{{ line.name }}</h4>
+                    <span class="line__code mono">{{ line.code }}</span>
+                    @if (line.size) {
+                      <span class="line__size">{{ line.size }}</span>
+                    }
+                  </div>
+
+                  @if (line.parts.length > 0) {
+                    <details class="line__parts">
+                      <summary>{{ 'invoice.partsIncluded' | translate: { count: line.parts.length } }}</summary>
+                      <ul>
+                        @for (part of line.parts; track part.partId) {
+                          <li>
+                            <span class="line__part-qty">×{{ part.quantity }}</span>
+                            <span class="line__part-name">{{ part.name }}</span>
+                            <span class="line__part-sku mono">{{ part.sku }}</span>
+                            <span class="line__part-price">{{ part.unitPrice | money: active().meta.currency }}</span>
+                          </li>
+                        }
+                      </ul>
+                    </details>
+                  }
+
+                  <div class="line__price">
+                    {{ 'invoice.unitPrice' | translate }}: {{ line.unitPrice | money: active().meta.currency }}
+                  </div>
+                </div>
+
+                <div class="line__qty">
+                  <span class="field-label">{{ 'common.quantity' | translate }}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    [value]="line.quantity"
+                    (input)="updateLineQty(line.id, $event)"
+                  />
+                </div>
+
+                <div class="line__total">
+                  {{ lineTotal(line) | money: active().meta.currency }}
+                </div>
+
+                <button
+                  type="button"
+                  class="line__remove"
+                  (click)="removeLine(line.id)"
+                  [attr.aria-label]="'common.remove' | translate"
+                >
+                  <app-icon name="delete" [size]="16" />
+                </button>
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Taxes -->
+      <section class="surface-card card">
+        <div class="card__head">
+          <h3 class="card__title">{{ 'invoice.taxes' | translate }}</h3>
+          <app-button variant="ghost" size="sm" (click)="addTax()">
+            <app-icon name="add" [size]="14" />
+            {{ 'invoice.addTax' | translate }}
+          </app-button>
+        </div>
+
+        @if (active().meta.taxes.length === 0) {
+          <p class="muted">{{ 'invoice.noTaxes' | translate }}</p>
+        } @else {
+          <div class="taxes">
+            @for (tax of active().meta.taxes; track tax.id) {
+              <div class="tax-row">
+                <label class="toggle">
+                  <input
+                    type="checkbox"
+                    [checked]="tax.enabled"
+                    (change)="toggleTax(tax.id, !tax.enabled)"
+                  />
+                  <span class="toggle__slider"></span>
+                </label>
+                <input
+                  type="text"
+                  class="tax-name"
+                  [value]="tax.name"
+                  (input)="updateTaxName(tax.id, $event)"
+                  [placeholder]="'invoice.taxName' | translate"
+                />
+                <select
+                  [value]="tax.type"
+                  (change)="updateTaxType(tax.id, $event)"
+                >
+                  <option value="percent">{{ 'invoice.percent' | translate }}</option>
+                  <option value="fixed">{{ 'invoice.fixed' | translate }}</option>
+                </select>
+                <input
+                  type="number"
+                  class="tax-value"
+                  [value]="tax.value"
+                  (input)="updateTaxValue(tax.id, $event)"
+                  min="0"
+                  step="0.01"
+                />
+                <span class="tax-amount mono">
+                  {{ taxAmount(tax) | money: active().meta.currency }}
+                </span>
+                <button
+                  type="button"
+                  class="tax-remove"
+                  (click)="removeTax(tax.id)"
+                  [attr.aria-label]="'common.remove' | translate"
+                >
+                  <app-icon name="close" [size]="14" />
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Notes -->
+      <section class="surface-card card">
+        <h3 class="card__title">{{ 'invoice.notes' | translate }}</h3>
+        <textarea
+          class="notes-input"
+          rows="3"
+          [value]="active().meta.notes"
+          (input)="updateMeta($event, 'notes')"
+          [placeholder]="'invoice.notesPlaceholder' | translate"
+        ></textarea>
+      </section>
+    </div>
+
+    <!-- ===================== Preview (right) ===================== -->
+    <aside class="preview-pane">
+      <div class="preview-sticky">
+        <div class="preview-toolbar">
+          <h3>{{ 'invoice.livePreview' | translate }}</h3>
+          <span class="muted">{{ active().meta.paperSize }}</span>
+        </div>
+
+        <!--
+          Live preview — uses ReceiptPreviewComponent (the same component the
+          receipt editor uses). Any layout changes made in the receipt editor
+          are immediately reflected here.
+        -->
+        <div class="preview-scroll">
+          <app-receipt-preview
+            [invoice]="active()"
+            [layout]="layout()"
+            [paperSize]="active().meta.paperSize"
+          />
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>

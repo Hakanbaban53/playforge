@@ -1,162 +1,69 @@
-@use "@angular/material" as mat;
-@use "sass:map";
-@use "sass:color";
+/* =============================================================================
+ * PlayForge — Global Design System
+ * -----------------------------------------------------------------------------
+ * No CSS framework. Hand-rolled tokens for color, spacing, typography, motion.
+ * Pure SCSS / CSS animations & transitions (no Angular Animations).
+ * ========================================================================== */
 
-// ============================================================================
-// 1. MODERN RESET & NORMALIZATION
-// ============================================================================
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
 
-* {
-  user-select: none;
-  transition:
-    background 0.5s ease,
-    background-color 0.5s ease,
-    color 0.05s ease;
-  -webkit-user-drag: none;
-}
-
-pre,
-code,
-input,
-textarea,
-[contenteditable="true"] {
-  user-select: text;
-  cursor: text;
-
-  span {
-    user-select: text;
-    cursor: text;
-  }
-}
-
-body,
-h1,
-h2,
-h3,
-h4,
-p,
-figure,
-blockquote,
-dl,
-dd {
-  margin: 0;
-}
-
-ul[role="list"],
-ol[role="list"] {
-  list-style: none;
-}
-
-body {
-  min-height: 100vh;
-  text-rendering: optimizeSpeed;
-  line-height: 1.5;
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    "Open Sans",
-    "Helvetica Neue",
-    sans-serif;
-  color: var(--text-primary);
-  background-color: var(--bg-body);
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
-  overflow: hidden; /* App-like feel */
-}
-
-a:not([class]) {
-  text-decoration-skip-ink: auto;
-}
-
-img,
-picture {
-  max-width: 100%;
-  display: block;
-}
-
-input,
-button,
-textarea,
-select {
-  font: inherit;
-}
-
-// ============================================================================
-// 2. DESIGN SYSTEM TOKENS (CSS VARIABLES)
-// ============================================================================
 :root {
-  /* --- PALETTE: Refined Gnome / Modern SaaS --- */
-  /* Brand Colors */
-  --primary-50: #e0f2f1;
-  --primary-100: #b2dfdb;
-  --primary-200: #80cbc4;
-  --primary-300: #4db6ac;
-  --primary-400: #26a69a;
-  --primary-500: #009688; /* Teal Base */
-  --primary-600: #00897b;
-  --primary-700: #00796b;
-  --primary-800: #00695c;
-  --primary-900: #004d40;
+  /* ---- Brand / palette ---- */
+  --brand-50: #eef9f3;
+  --brand-100: #d6f0e2;
+  --brand-200: #aee2c6;
+  --brand-300: #79cf9f;
+  --brand-400: #44b674;
+  --brand-500: #1f9d56;
+  --brand-600: #138044;
+  --brand-700: #0f6638;
+  --brand-800: #0d5030;
+  --brand-900: #0a3d26;
 
-  --accent-50: #e3f2fd;
-  --accent-100: #bbdefb;
-  --accent-200: #90caf9;
-  --accent-300: #64b5f6;
-  --accent-400: #42a5f5;
-  --accent-500: #2196f3; /* Blue Base */
-  --accent-600: #1e88e5;
-  --accent-700: #1976d2;
-  --accent-800: #1565c0;
-  --accent-900: #0d47a1;
+  --accent-500: #f59e0b;
+  --accent-600: #d97706;
 
-  /* Neutrals (Slate) */
-  --slate-25: #f8fafc;
-  --slate-50: #f1f5f9;
-  --slate-100: #e2e8f0;
-  --slate-200: #cbd5e1;
-  --slate-300: #94a3b8;
-  --slate-400: #64748b;
-  --slate-500: #475569;
-  --slate-600: #334155;
-  --slate-700: #1e293b;
-  --slate-800: #0f172a;
-  --slate-900: #020617;
+  /* ---- Neutral surface ---- */
+  --surface-0: #ffffff;
+  --surface-50: #f8fafb;
+  --surface-100: #f1f5f7;
+  --surface-200: #e6ebef;
+  --surface-300: #d2dade;
+  --surface-400: #9aa6af;
+  --surface-500: #6b7782;
+  --surface-600: #4b5560;
+  --surface-700: #353d46;
+  --surface-800: #1f242b;
+  --surface-900: #11151a;
 
-  /* Semantic Colors (Light Mode Default) */
-  --bg-body: var(--slate-50);
-  --bg-surface: #ffffff;
-  --bg-surface-subtle: var(--slate-50);
-  --bg-surface-hover: var(--slate-100);
+  /* ---- Status ---- */
+  --info-500: #3b82f6;
+  --info-50: #eff6ff;
+  --success-500: #16a34a;
+  --success-50: #f0fdf4;
+  --warn-500: #d97706;
+  --warn-50: #fffbeb;
+  --danger-500: #dc2626;
+  --danger-50: #fef2f2;
+  --danger-700: #991b1b;
 
-  --text-primary: var(--slate-900);
-  --text-secondary: var(--slate-600);
-  --text-tertiary: var(--slate-400);
-  --text-on-primary: #ffffff;
+  /* ---- Text ---- */
+  --text-strong: #0c1116;
+  --text-base: #1f242b;
+  --text-muted: #4b5560;
+  --text-subtle: #6b7782;
+  --text-on-brand: #ffffff;
 
-  --border-subtle: var(--slate-200);
-  --border-default: var(--slate-300);
+  /* ---- Layout ---- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
 
-  --color-primary: var(--primary-600);
-  --color-primary-hover: var(--primary-700);
-  --color-accent: var(--accent-600);
-  --color-danger: #ef4444;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 32, 0.06);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 32, 0.08);
+  --shadow-md: 0 8px 20px rgba(15, 23, 32, 0.10);
+  --shadow-lg: 0 18px 44px rgba(15, 23, 32, 0.14);
 
-  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -168,168 +75,259 @@ select {
   --space-12: 48px;
   --space-16: 64px;
 
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-full: 9999px;
+  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+  --font-icons: 'Material Symbols Rounded';
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg:
-    0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl:
-    0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --motion-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --app-max-width: 1480px;
 
-  /* Dimensions */
-  --titlebar-height: 32px;
-  --header-height: 64px;
-
-  /* Z-Index */
-  --z-overlay: 50;
-  --z-modal: 100;
-  --z-toast: 200;
+  /* ---- App background (light) ---- */
+  --app-bg:
+    radial-gradient(1200px 600px at 110% -10%, rgba(31, 157, 86, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(245, 158, 11, 0.06), transparent 60%),
+    var(--surface-50);
+  --sidebar-bg: linear-gradient(180deg, var(--surface-900) 0%, var(--surface-800) 100%);
+  --sidebar-text: rgba(255, 255, 255, 0.86);
+  --sidebar-text-muted: rgba(255, 255, 255, 0.55);
+  --sidebar-text-subtle: rgba(255, 255, 255, 0.45);
+  --sidebar-active-bg: linear-gradient(135deg, rgba(31, 157, 86, 0.22), rgba(31, 157, 86, 0.08));
+  --sidebar-active-border: rgba(31, 157, 86, 0.35);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+  --invoice-sheet-bg: #ffffff;
 }
 
-/* Dark Mode Overrides */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-body: var(--slate-900);
-    --bg-surface: var(--slate-800);
-    --bg-surface-subtle: var(
-      --slate-800
-    ); /* Slightly lighter/different in real implementations */
-    --bg-surface-hover: var(--slate-700);
+/* =============================================================================
+ * Dark theme — overrides only the tokens that change.
+ * Activated by `<html data-theme="dark">`.
+ * ========================================================================== */
+[data-theme='dark'] {
+  --brand-50: #0d2818;
+  --brand-100: #103a22;
+  --brand-200: #155430;
+  --brand-300: #1e7240;
+  --brand-400: #2a9554;
+  --brand-500: #38b567;
+  --brand-600: #4cc97c;
+  --brand-700: #6dd99a;
+  --brand-800: #95e6b3;
+  --brand-900: #bdf4cf;
 
-    --text-primary: var(--slate-50);
-    --text-secondary: var(--slate-300);
-    --text-tertiary: var(--slate-500);
+  --accent-500: #fbbf24;
+  --accent-600: #f59e0b;
 
-    --border-subtle: var(--slate-700);
-    --border-default: var(--slate-600);
+  --surface-0: #1a1f26;
+  --surface-50: #14181d;
+  --surface-100: #1f242b;
+  --surface-200: #2a3138;
+  --surface-300: #3a424b;
+  --surface-400: #5a636d;
+  --surface-500: #7a838d;
+  --surface-600: #9aa3ad;
+  --surface-700: #b6bdc4;
+  --surface-800: #d2d7dc;
+  --surface-900: #eaeef1;
 
-    /* Adjust prominence for dark mode */
-    --color-primary: var(--primary-400);
-    --color-primary-hover: var(--primary-300);
-    --color-accent: var(--accent-400);
-  }
-}
+  --info-50: #172554;
+  --success-50: #0c2818;
+  --warn-50: #2a1a02;
+  --danger-50: #2a0e0e;
+  --danger-700: #fca5a5;
 
-// ============================================================================
-// 3. UTILITY CLASSES (Tailwind-inspired)
-// ============================================================================
+  --text-strong: #f1f5f7;
+  --text-base: #d2dade;
+  --text-muted: #9aa6af;
+  --text-subtle: #6b7782;
+  --text-on-brand: #0c1116;
 
-// Typography
-.text-h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-}
-.text-h2 {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.25;
-}
-.text-h3 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.3;
-}
-.text-body {
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1.5;
-}
-.text-sm {
-  font-size: 0.875rem;
-  font-weight: 400;
-  line-height: 1.4;
-}
-.text-xs {
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.55);
+
+  --app-bg:
+    radial-gradient(1200px 600px at 110% -10%, rgba(56, 181, 103, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(251, 191, 36, 0.05), transparent 60%),
+    var(--surface-50);
+  --sidebar-bg: linear-gradient(180deg, #0a0d10 0%, #11151a 100%);
+  --invoice-sheet-bg: #ffffff; /* Invoice PDF always renders on white */
 }
 
-.font-bold {
-  font-weight: 700;
-}
-.font-medium {
-  font-weight: 500;
-}
-
-.text-muted {
-  color: var(--text-secondary);
-}
-.text-primary {
-  color: var(--color-primary);
+[data-theme='dark'] body {
+  background: var(--app-bg);
+  color: var(--text-base);
+  /* Tell the browser to render native controls (date pickers, selects,
+     scrollbars, etc.) in dark mode. This is the single most important
+     dark-mode fix for form controls. */
+  color-scheme: dark;
 }
 
-// Layout
-.flex {
-  display: flex;
-}
-.flex-col {
-  flex-direction: column;
-}
-.items-center {
-  align-items: center;
-}
-.justify-between {
-  justify-content: space-between;
-}
-.justify-center {
-  justify-content: center;
-}
-.gap-2 {
-  gap: var(--space-2);
-}
-.gap-4 {
-  gap: var(--space-4);
+[data-theme='dark'] h1,
+[data-theme='dark'] h2,
+[data-theme='dark'] h3,
+[data-theme='dark'] h4,
+[data-theme='dark'] h5 {
+  color: var(--text-strong);
 }
 
-// Spacing
-.p-4 {
-  padding: var(--space-4);
+/* ---- Dark mode form controls ---- */
+/* Native inputs don't automatically inherit dark theme colors — we need
+   to explicitly set them. The `color-scheme: dark` above handles the
+   date picker calendar popup, but the input text itself still needs help. */
+[data-theme='dark'] input[type='text'],
+[data-theme='dark'] input[type='email'],
+[data-theme='dark'] input[type='number'],
+[data-theme='dark'] input[type='date'],
+[data-theme='dark'] input[type='search'],
+[data-theme='dark'] input[type='password'],
+[data-theme='dark'] input[type='color'],
+[data-theme='dark'] select,
+[data-theme='dark'] textarea {
+  color: var(--text-base);
+  background-color: var(--surface-0);
+  border-color: var(--surface-400);
 }
-.m-0 {
+
+[data-theme='dark'] input::placeholder,
+[data-theme='dark'] textarea::placeholder {
+  color: var(--text-subtle);
+  opacity: 0.7;
+}
+
+/* Date picker calendar icon (WebKit/Blink) */
+[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
+}
+
+/* Select dropdown arrow (WebKit/Blink) */
+[data-theme='dark'] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%239aa6af'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+}
+
+/* Color input swatch border */
+[data-theme='dark'] input[type='color'] {
+  border: 1px solid var(--surface-400);
+  padding: 2px;
+}
+
+/* Scrollbar in dark mode */
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: var(--surface-500);
+}
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-400);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+body {
   margin: 0;
-}
-.mb-4 {
-  margin-bottom: var(--space-4);
-}
-
-// Components
-.card {
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-base);
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--motion-base), color var(--motion-base);
 }
 
-mat-form-field {
+h1, h2, h3, h4, h5 {
+  margin: 0;
+  color: var(--text-strong);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+p { margin: 0; }
+
+a { color: var(--brand-700); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font-family: inherit; }
+
+/* ---- Utility primitives (used app-wide) ---- */
+.app-container {
   width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
 }
 
-// ============================================================================
-// 4. ANGULAR MATERIAL THEME OVERRIDES (Minimal)
-// ============================================================================
-// We are mostly overriding via variables, but here we can force some defaults.
+.surface-card {
+  background: var(--surface-0);
+  border: 1px solid var(--surface-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
 
-.mat-mdc-card {
-  border-radius: var(--radius-lg) !important;
-  background-color: var(--bg-surface) !important;
-  box-shadow: var(--shadow-sm) !important;
+.muted { color: var(--text-muted); }
+.subtle { color: var(--text-subtle); }
+.mono { font-family: var(--font-mono); }
+
+/* ---- Scrollbar (subtle, modern) ---- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-300);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--surface-400); background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Enter animations (CSS only, no Angular Animations) ---- */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.anim-fade-in   { animation: fade-in var(--motion-base) both; }
+.anim-slide-in  { animation: slide-in-right var(--motion-base) both; }
+.anim-scale-in  { animation: scale-in var(--motion-base) both; }
+
+/* Staggered list items */
+.stagger > * { animation: fade-in var(--motion-base) both; }
+.stagger > *:nth-child(1) { animation-delay: 30ms; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 150ms; }
+.stagger > *:nth-child(6) { animation-delay: 180ms; }
+.stagger > *:nth-child(7) { animation-delay: 210ms; }
+.stagger > *:nth-child(8) { animation-delay: 240ms; }
+
+/* Reduced-motion respect */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

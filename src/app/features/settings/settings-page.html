@@ -1,0 +1,224 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'settings.title' | translate }}</h1>
+      <p class="muted">{{ 'settings.subtitle' | translate }}</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Catalog stats -->
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'settings.catalogStats' | translate }}</h3>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat__value">{{ families().length }}</span>
+          <span class="stat__label">{{ 'settings.families' | translate }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">{{ variants().length }}</span>
+          <span class="stat__label">{{ 'settings.variants' | translate }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">{{ totalParts() }}</span>
+          <span class="stat__label">{{ 'settings.uniqueParts' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Appearance: theme + language -->
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'settings.appearance' | translate }}</h3>
+
+      <div class="setting-row">
+        <div class="setting-row__meta">
+          <div class="setting-row__label">{{ 'settings.themeLabel' | translate }}</div>
+          <div class="muted small">{{ 'settings.themeDesc' | translate }}</div>
+        </div>
+        <div class="seg-buttons">
+          @for (mode of themeModes; track mode) {
+            <button
+              type="button"
+              [class.seg-btn--active]="themeMode() === mode"
+              (click)="setTheme(mode)"
+            >{{ 'theme.' + mode | translate }}</button>
+          }
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-row__meta">
+          <div class="setting-row__label">{{ 'settings.languageLabel' | translate }}</div>
+          <div class="muted small">{{ 'settings.languageDesc' | translate }}</div>
+        </div>
+        <div class="seg-buttons">
+          @for (lang of languages; track lang) {
+            <button
+              type="button"
+              [class.seg-btn--active]="currentLang() === lang"
+              (click)="setLang(lang)"
+            >{{ 'language.' + lang | translate }}</button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- App updates (Tauri only) -->
+    @if (isTauri()) {
+      <div class="surface-card card">
+        <h3 class="card__title">{{ 'settings.appUpdates' | translate }}</h3>
+        <p class="muted small">{{ 'settings.appUpdatesDesc' | translate }}</p>
+
+        @if (updateService.checking()) {
+          <div class="update-status">
+            <app-icon name="progress_activity" [size]="16" />
+            {{ 'settings.checkingForUpdates' | translate }}
+          </div>
+        }
+
+        @if (updateService.error()) {
+          <div class="alert alert--error">{{ updateService.error() }}</div>
+        }
+
+        @if (updateService.updateAvailable(); as update) {
+          <div class="update-available">
+            <div class="update-available__info">
+              <div class="update-available__version">v{{ update.version }}</div>
+              <div class="muted small">{{ 'settings.updateAvailableDesc' | translate: { version: update.version } }}</div>
+            </div>
+            @if (updateService.downloading()) {
+              <div class="update-progress">
+                <div class="update-progress__bar">
+                  <div class="update-progress__fill" [style.width.%]="updateService.progress()?.percentage ?? 0"></div>
+                </div>
+                <span class="muted small">{{ updateService.progress()?.percentage?.toFixed(0) ?? 0 }}%</span>
+              </div>
+            } @else {
+              <app-button variant="primary" size="sm" (click)="updateService.downloadAndInstall()">
+                <app-icon name="download" [size]="14" />
+                {{ 'settings.downloadAndInstall' | translate }}
+              </app-button>
+            }
+          </div>
+        } @else if (!updateService.checking() && !updateService.error()) {
+          <div class="update-status update-status--ok">
+            <app-icon name="check" [size]="16" />
+            {{ 'settings.upToDate' | translate }}
+          </div>
+        }
+
+        <app-button variant="secondary" size="sm" (click)="updateService.checkForUpdates()" [disabled]="updateService.checking()">
+          <app-icon name="restart_alt" [size]="14" />
+          {{ 'settings.checkNow' | translate }}
+        </app-button>
+      </div>
+    }
+
+    <!-- Currency & exchange rates -->
+    <div class="surface-card card card--wide">
+      <h3 class="card__title">{{ 'settings.currencySettings' | translate }}</h3>
+      <p class="muted small">{{ 'settings.currencyDesc' | translate }}</p>
+
+      <table class="rate-table">
+        <thead>
+          <tr>
+            <th>{{ 'common.currency' | translate }}</th>
+            <th>{{ 'settings.rate' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (code of supportedCurrencies; track code) {
+            <tr>
+              <td class="rate-table__code">
+                <strong>{{ code }}</strong>
+                @if (code === baseCurrency()) {
+                  <span class="badge">{{ 'settings.baseCurrency' | translate }}</span>
+                }
+              </td>
+              <td>
+                @if (code === 'USD') {
+                  <span class="muted mono">1.00 (fixed)</span>
+                } @else {
+                  <input
+                    type="number"
+                    class="rate-input"
+                    step="0.0001"
+                    min="0"
+                    [value]="rateFor(code)"
+                    (input)="updateRate(code, $event)"
+                  />
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Invoice defaults -->
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'settings.invoiceDefaults' | translate }}</h3>
+      <p class="muted small">{{ 'settings.invoiceDefaultsDesc' | translate }}</p>
+
+      <label class="field">
+        <span>{{ 'settings.defaultPaper' | translate }}</span>
+        <select [value]="defaults().paperSize" (change)="setDefaultPaper($event)">
+          <option value="A4">A4</option>
+          <option value="A5">A5</option>
+          <option value="Letter">Letter</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>{{ 'settings.defaultCurrency' | translate }}</span>
+        <select [value]="defaults().currency" (change)="setDefaultCurrency($event)">
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="TRY">TRY</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>{{ 'settings.defaultVat' | translate }}</span>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="0.5"
+          [value]="defaults().vatPercent"
+          (input)="setDefaultVat($event)"
+        />
+      </label>
+    </div>
+
+    <!-- Catalog actions -->
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'settings.catalogActions' | translate }}</h3>
+      <p class="muted small">{{ 'settings.catalogActionsDesc' | translate }}</p>
+      <app-button variant="secondary" size="md" (click)="clearCatalog()">
+        <app-icon name="delete" [size]="14" />
+        {{ 'settings.clearCatalog' | translate }}
+      </app-button>
+    </div>
+
+    <!-- Invoice actions -->
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'settings.invoiceActions' | translate }}</h3>
+      <p class="muted small">{{ 'settings.invoiceActionsDesc' | translate }}</p>
+      <app-button variant="secondary" size="md" (click)="clearInvoice()">
+        <app-icon name="delete" [size]="14" />
+        {{ 'settings.clearInvoice' | translate }}
+      </app-button>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="surface-card card card--danger">
+      <h3 class="card__title card__title--danger">{{ 'settings.dangerZone' | translate }}</h3>
+      <p class="muted small">{{ 'settings.dangerZoneDesc' | translate }}</p>
+      <app-button variant="danger" size="md" (click)="wipeAll()">
+        <app-icon name="delete" [size]="14" />
+        {{ 'settings.wipeAll' | translate }}
+      </app-button>
+    </div>
+  </div>
+</section>

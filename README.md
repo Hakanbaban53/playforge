@@ -22,6 +22,8 @@
 - Element-aware pagination — no element is split across pages
 - Customer-facing invoice with configurable layout, taxes, and notes
 - Images embedded as proper PDF objects (no base64 leaks)
+- **Quote vs Invoice distinction** — same shape, different document-number prefix (`QUO-` vs `INV-`) and PDF heading; one-click "Convert to invoice"
+- **Per-line discounts** — percent or fixed amount; reflected in line totals, subtotal, taxes, and PDF
 
 ### 🎨 Receipt Layout Editor
 - Drag-and-drop element reordering (Angular CDK)
@@ -29,6 +31,23 @@
 - Per-element style control: font size stepper, color picker, image width/height/fit/alignment/radius
 - Live preview that matches PDF output exactly
 - Layout persisted to localStorage
+
+### 👥 Customer Book & Invoice History
+- Maintain a reusable customer book (name, tax id, email, phone, address, notes)
+- "Use for active invoice" copies customer fields onto the invoice meta in one click
+- Saved-invoice history panel — click "Clone to editor" to load any past invoice back into the active editor (with a new id, so the original is preserved)
+- Quote/invoice badge on each saved document card
+
+### ⭐ Catalog Favorites
+- Star icon on every product card to mark favorites
+- "Show only favorites" filter in the catalog sidebar (with count)
+- Persisted in localStorage across reloads
+
+### 🔔 Toast Notifications
+- App-wide toast service with success / info / warn / error kinds
+- Mounted once in `app.html` (`<app-toaster>`)
+- Auto-dismiss with configurable TTL; manual dismiss button
+- Routes existing success/error paths (PDF, upload, save, favorite, add-to-invoice) through the toast queue
 
 ### 📊 Excel Import / Export
 - Downloadable localized template (Turkish + English column headers)
@@ -43,6 +62,7 @@
 - English + Turkish with runtime switching
 - `APP_INITIALIZER` loads translations before first paint — no key flashing
 - All UI text, error messages, and Excel template headers are localized
+- `<html lang>` attribute stays in sync with the active language (screen-reader friendly)
 
 ### 🎨 Theming
 - Light / Dark / System theme with `data-theme` attribute
@@ -62,6 +82,7 @@
 - Desktop: collapsible sidebar with hover-to-reveal toggle
 - Mobile: slide-in drawer with backdrop + top bar
 - All pages optimized for touch (≤768px breakpoints)
+- Shell-level `overflow-x: hidden` so any in-page horizontal overflow stays on the page (no leaky shell scrollbars)
 
 ## Tech Stack
 
@@ -90,19 +111,21 @@ playforge/
 │   └── app/
 │       ├── core/
 │       │   ├── models/           # Type-safe domain models
-│       │   ├── services/         # 19 focused services
+│       │   ├── services/         # Focused services (catalog, configurator,
+│       │   │                     # invoice, customers, favorites, toast, ...)
 │       │   └── utils/            # Shared utility functions
-│       ├── features/             # 8 lazy-loaded pages
-│       │   ├── catalog/          # Browse products
+│       ├── features/             # Lazy-loaded pages
+│       │   ├── catalog/          # Browse products (with favorites filter)
 │       │   ├── configurator/     # Parts-based builder
-│       │   ├── invoice/          # Invoice + PDF export
+│       │   ├── invoice/          # Invoice + PDF export (quote/invoice + discounts)
+│       │   ├── customers/        # Customer book + saved invoice history
 │       │   ├── receipt-editor/   # Drag-drop layout editor
 │       │   ├── import/           # Excel import wizard
 │       │   ├── export/           # Excel/CSV export
 │       │   ├── catalog-management/ # CRUD for families/variants/parts
 │       │   └── settings/         # Theme, language, currency, updates
 │       └── shared/
-│           ├── components/       # Icon, Button, ResolvedImg, ReceiptPreview
+│           ├── components/       # Icon, Button, ResolvedImg, ReceiptPreview, Toaster
 │           └── pipes/            # MoneyPipe
 │
 ├── src-tauri/                    # Tauri backend (~50 lines Rust)

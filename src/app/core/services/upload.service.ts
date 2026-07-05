@@ -4,21 +4,13 @@ import { FileStorageAdapter, StoredFile } from './file-storage.adapter';
 export interface UploadedFile {
   /**
    * Stable URL reference that survives page reloads. Format:
-   *   - Web: `idb://<id>` — resolved to a `blob:` URL on demand by the
-   *     renderer (image-resolver.service.ts).
-   *   - Tauri (future): `asset://localhost/<id>` — directly usable.
-   *
-   * The reference is stored in catalog/invoice data; the renderer resolves
-   * it to a real URL just before display or PDF generation.
+   *   - Web: `idb://<id>` — resolved to a `blob:` URL on demand.
+   *   - Tauri: `asset://localhost/<id>` — directly usable.
    */
   url: string;
-  /** StoredFile metadata (id, name, mimeType, size). */
   stored: StoredFile;
-  /** Convenience: original filename. */
   filename: string;
-  /** Convenience: file size in bytes. */
   size: number;
-  /** Convenience: MIME type. */
   mimetype: string;
 }
 

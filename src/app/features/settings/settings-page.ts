@@ -36,7 +36,7 @@ export class SettingsPage {
   readonly families = this.catalog.families;
   readonly variants = this.catalog.variants;
   readonly updateService = this.updateSvc;
-  readonly isTauri = UpdateService.isTauri;
+  readonly isTauri = () => UpdateService.isTauri();
 
   /** Count of unique parts across all families (de-duplicated by sku). */
   readonly totalParts = computed(() => {
@@ -109,9 +109,20 @@ export class SettingsPage {
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith('pgpos:')) keys.push(k);
+      if (k?.startsWith('pgpos:')) keys.push(k);
     }
     keys.forEach((k) => localStorage.removeItem(k));
+    await this.wipeIndexedDB();
     location.reload();
+  }
+
+  private wipeIndexedDB(): Promise<void> {
+    if (typeof indexedDB === 'undefined') return Promise.resolve();
+    return new Promise((resolve) => {
+      const req = indexedDB.deleteDatabase('pgpos-files');
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    });
   }
 }

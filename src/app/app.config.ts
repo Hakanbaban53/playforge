@@ -2,7 +2,7 @@ import {
   ApplicationConfig,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
-  APP_INITIALIZER,
+  provideAppInitializer,
   inject,
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
@@ -26,15 +26,6 @@ function isTauriEnvironment(): boolean {
   return typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
 }
 
-/**
- * APP_INITIALIZER factory — loads translations BEFORE the UI renders.
- * This prevents the "raw translation keys flashing" on first paint.
- */
-function initializeI18n(): () => Promise<void> {
-  const i18n = inject(I18nService);
-  return () => i18n.init();
-}
-
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -48,13 +39,8 @@ export const appConfig: ApplicationConfig = {
         deps: [HttpClient],
       },
     }),
-    // Load translations before first paint — no more key flashing.
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initializeI18n,
-      deps: [],
-      multi: true,
-    },
+    provideAppInitializer(() => inject(I18nService).init()),
+    provideAppInitializer(() => { inject(ThemeService); }),
     {
       provide: FileStorageAdapter,
       useFactory: () => {
@@ -62,14 +48,6 @@ export const appConfig: ApplicationConfig = {
           return new TauriFileStorageAdapter();
         }
         return new BrowserFileStorageAdapter();
-      },
-    },
-    {
-      provide: 'INIT_THEME',
-      useFactory: () => {
-        const t = new ThemeService();
-        t.applyInitial();
-        return t;
       },
     },
   ],

@@ -213,11 +213,10 @@ export class CatalogManagementPage {
     this.fVariantLabel.set(v.label);
     this.fVariantSku.set(v.sku);
     this.fVariantActive.set(v.active);
-    // Find size & price overrides if present
     const sizeOv = v.overrides.find((o) => o.key === 'size');
     const priceOv = v.overrides.find((o) => o.key === 'price');
-    this.fVariantSize.set(sizeOv && sizeOv.key === 'size' ? sizeOv.value : '');
-    this.fVariantPrice.set(priceOv && priceOv.key === 'price' ? priceOv.value : 0);
+    this.fVariantSize.set(sizeOv?.value ?? '');
+    this.fVariantPrice.set(priceOv?.value ?? 0);
     this.error.set(null);
   }
 
@@ -366,25 +365,16 @@ export class CatalogManagementPage {
     this.fCurrency.set((event.target as HTMLSelectElement).value);
   }
 
-  /** Get the resolved price of a variant (from override or default sum). */
   variantPrice(v: ProductVariant): number {
     const priceOv = v.overrides.find((o) => o.key === 'price');
-    if (priceOv && priceOv.key === 'price') return priceOv.value;
-    const fam = this.familyById().get(v.familyId);
-    return fam ? fam.availableParts.reduce((sum, p) => sum + p.price, 0) : 0;
+    if (priceOv) return priceOv.value;
+    return this.familyById().get(v.familyId)?.availableParts.reduce((sum, p) => sum + p.price, 0) ?? 0;
   }
 
-  /** Variant size (from override). */
   variantSize(v: ProductVariant): string {
-    const sizeOv = v.overrides.find((o) => o.key === 'size');
-    return sizeOv && sizeOv.key === 'size' ? sizeOv.value : '—';
+    return v.overrides.find((o) => o.key === 'size')?.value ?? '—';
   }
 
-  /**
-   * Upload image files via the backend `/api/upload` endpoint and append
-   * the returned stable URLs to the family's images textarea. Replaces the
-   * broken data-URI approach.
-   */
   async onImageUpload(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = input.files;

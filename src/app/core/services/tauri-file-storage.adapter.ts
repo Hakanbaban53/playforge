@@ -59,24 +59,18 @@ export class TauriFileStorageAdapter extends FileStorageAdapter {
     const appData = await path.appDataDir();
     this.imagesDir = await path.join(appData, 'images');
     const fs = await this.getFs();
-    try {
-      await fs.exists(this.imagesDir);
-    } catch {
-      await fs.mkdir(this.imagesDir, { recursive: true });
-    }
-    // Ensure the directory exists.
+    // `recursive: true` makes this a no-op if the dir already exists.
     try {
       await fs.mkdir(this.imagesDir, { recursive: true });
     } catch {
-      // already exists — fine
+      // Permission denied — fall through; writeFile will surface a real error.
     }
     return this.imagesDir;
   }
 
-  /** Extract file extension from filename, defaulting to `.bin`. */
   private ext(name: string): string {
     if (!name) return '.bin';
-    const m = name.match(/\.[a-z0-9]+$/i);
+    const m = /\.[a-z0-9]+$/i.exec(name);
     return m ? m[0] : '.bin';
   }
 
@@ -138,7 +132,7 @@ export class TauriFileStorageAdapter extends FileStorageAdapter {
 
     try {
       const bytes = await fs.readFile(filepath);
-      return bytes.buffer as ArrayBuffer;
+      return bytes.buffer;
     } catch {
       return null;
     }

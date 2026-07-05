@@ -74,7 +74,6 @@ export class ExportService {
       : this.toXlsxBlob([headers, ...rows], this.i18n.t('invoice.title'));
   }
 
-  /** Convenience: trigger a browser download for a blob. */
   triggerDownload(blob: Blob, fileName: string): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

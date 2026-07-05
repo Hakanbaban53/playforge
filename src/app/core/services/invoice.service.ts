@@ -3,6 +3,7 @@ import {
   Invoice,
   InvoiceLine,
   InvoiceMeta,
+  LineDiscount,
   TaxLine,
   lineTotal,
 } from '../models/invoice.model';
@@ -28,7 +29,9 @@ export class InvoiceService {
   private readonly _active = signal<Invoice>(this.loadActive());
   readonly active = this._active.asReadonly();
 
-  /** Subtotal = Σ line.unitPrice × line.quantity. */
+  private readonly _savedVersion = signal(0);
+  readonly savedVersion = this._savedVersion.asReadonly();
+
   readonly subtotal = computed(() =>
     this._active().lines.reduce((sum, l) => sum + lineTotal(l), 0),
   );
@@ -83,6 +86,10 @@ export class InvoiceService {
   updateLineQuantity(lineId: string, quantity: number): void {
     const qty = Math.max(1, Math.floor(quantity));
     this.updateLine(lineId, { quantity: qty });
+  }
+
+  updateLineDiscount(lineId: string, discount: LineDiscount | undefined): void {
+    this.updateLine(lineId, { discount });
   }
 
   updateMeta(patch: Partial<InvoiceMeta>): void {
@@ -152,14 +159,85 @@ export class InvoiceService {
     const all = this.storage.read<Invoice[]>(this.savedKey, []);
     all.push(saved);
     this.storage.write(this.savedKey, all);
+    this._savedVersion.update((v) => v + 1);
     this._active.set(this.freshInvoice());
     this.persistActive();
     return saved;
   }
 
-  /** List previously saved invoices. */
+  /**
+   * Replace the active invoice with a previously-saved one (clones its id,
+   * meta, and lines). Used by the "clone to editor" action on the customers
+   * page. Does NOT mutate the saved list.
+   */
+  loadSaved(invoice: Invoice): void {
+    this._active.set({
+      ...invoice,
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    this.persistActive();
+  }
+
+  /** Delete a previously-saved invoice by id. */
+  deleteSaved(invoiceId: string): void {
+    const all = this.storage.read<Invoice[]>(this.savedKey, []);
+    const next = all.filter((inv) => inv.id !== invoiceId);
+    this.storage.write(this.savedKey, next);
+    this._savedVersion.update((v) => v + 1);
+  }
+
+  /** Switch the active document between quote and invoice. Re-issues the
+   *  document number with the appropriate prefix. */
+  setDocType(docType: 'quote' | 'invoice'): void {
+    this._active.update((inv) => ({
+      ...inv,
+      meta: {
+        ...inv.meta,
+        docType,
+        invoiceNumber: this.renumber(inv.meta.invoiceNumber, docType),
+      },
+      updatedAt: Date.now(),
+    }));
+    this.persistActive();
+  }
+
+  /** Convert the active quote into an invoice — convenience wrapper that
+   *  flips `docType` and re-numbers in one call. */
+  convertToInvoice(): void {
+    if (this._active().meta.docType === 'invoice') return;
+    this.setDocType('invoice');
+  }
+
+  /** Replace the prefix of a document number (INV / QUO). */
+  private renumber(currentNumber: string, docType: 'quote' | 'invoice'): string {
+    const prefix = docType === 'quote' ? 'QUO' : 'INV';
+    const other = docType === 'quote' ? 'INV' : 'QUO';
+    if (currentNumber.startsWith(`${prefix}-`)) return currentNumber;
+    if (currentNumber.startsWith(`${other}-`)) {
+      return `${prefix}-${currentNumber.slice(other.length + 1)}`;
+    }
+    // Doesn't match either prefix — prepend ours.
+    return `${prefix}-${currentNumber}`;
+  }
+
+  /** List previously saved invoices (depends on `savedVersion` so reactive
+   *  callers re-evaluate when the list changes). */
   listSaved(): Invoice[] {
-    return this.storage.read<Invoice[]>(this.savedKey, []);
+    // Read the version signal so computed() callers re-run on save/delete.
+    this._savedVersion();
+    const raw = this.storage.read<Invoice[]>(this.savedKey, []);
+    // Backward-compat: invoices saved before the `docType` field was added
+    // default to `'invoice'`. Same for the `customerId` field.
+    return raw.map((inv) => ({
+      ...inv,
+      meta: {
+        ...inv.meta,
+        docType: inv.meta.docType ?? 'invoice',
+      },
+      lines: inv.lines.map((l) => ({ ...l })),
+    }));
   }
 
   // ---------------------------------------------------------------------------
@@ -172,19 +250,30 @@ export class InvoiceService {
 
   private loadActive(): Invoice {
     const stored = this.storage.read<Invoice | null>(this.activeKey, null);
-    if (stored) return stored;
+    if (stored) {
+      // Backward-compat: pre-`docType` invoices default to 'invoice'.
+      return {
+        ...stored,
+        meta: {
+          ...stored.meta,
+          docType: stored.meta.docType ?? 'invoice',
+        },
+      };
+    }
     return this.freshInvoice();
   }
 
-  private freshInvoice(): Invoice {
+  private freshInvoice(docType: 'quote' | 'invoice' = 'invoice'): Invoice {
     const defaults = this.defaultsService.defaults();
     const today = new Date();
     const issueDate = today.toISOString().slice(0, 10);
     const due = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
+    const prefix = docType === 'quote' ? 'QUO' : 'INV';
     return {
       id: crypto.randomUUID(),
       meta: {
-        invoiceNumber: `INV-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 9999)
+        docType,
+        invoiceNumber: `${prefix}-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 9999)
           .toString()
           .padStart(4, '0')}`,
         issueDate,

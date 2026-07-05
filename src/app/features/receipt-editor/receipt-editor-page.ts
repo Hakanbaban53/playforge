@@ -1,4 +1,4 @@
-import { Component, inject, signal, DestroyRef } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { CdkDragDrop, CdkDrag, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -6,7 +6,7 @@ import { ReceiptLayoutService } from '../../core/services/receipt-layout.service
 import { InvoiceService } from '../../core/services/invoice.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { UploadService } from '../../core/services/upload.service';
-import { ImageResolverService } from '../../core/services/image-resolver.service';
+import { ToastService } from '../../core/services/toast.service';
 import { LayoutElement, LayoutElementType, ReceiptStyles } from '../../core/models/receipt.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
@@ -20,15 +20,13 @@ import {
 
 /**
  * Receipt layout editor — drag-drop reorder, add text/image/divider/totals
- * blocks, edit per-element styles (including a font-size stepper for
- * arbitrary px values), toggle visibility, and persist the layout.
+ * blocks, edit per-element styles, toggle visibility, and persist the layout.
  *
- * The live preview on the right renders every visible element from the
- * layout — **including** the totals block, which is now a first-class
- * draggable element rather than a hardcoded piece outside the editable area.
+ * The live preview renders every visible element from the layout (including
+ * the totals block, which is a first-class draggable element).
  *
- * Image uploads go through `UploadService` → `/api/upload` → stable URL on
- * the server. No more data URIs in localStorage (which broke PDF rendering).
+ * Image uploads go through `UploadService` → `FileStorageAdapter` → stable
+ * `idb://` URL (browser) or `asset://` URL (Tauri).
  */
 @Component({
   selector: 'app-receipt-editor-page',
@@ -51,9 +49,8 @@ export class ReceiptEditorPage {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly uploadService = inject(UploadService);
-  private readonly imageResolver = inject(ImageResolverService);
   private readonly confirmSvc = inject(ConfirmService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   readonly layout = this.layoutService.layout;
   readonly active = this.invoice.active;
@@ -140,6 +137,7 @@ export class ReceiptEditorPage {
     if (!await this.confirmSvc.confirm(this.i18n.t('common.confirm'), 'Reset layout')) return;
     this.layoutService.resetToDefault();
     this.selectedId.set(null);
+    this.toast.info('toast.layoutReset');
   }
 
   goBack(): void {
@@ -171,6 +169,7 @@ export class ReceiptEditorPage {
       case 'table': return 'table_chart';
       case 'meta': return 'info';
       case 'totals': return 'calculate';
+      case 'notes': return 'sticky_note_2';
       case 'visuals': return 'image';
       case 'text': return 'text_snippet';
       case 'image': return 'image';
@@ -206,9 +205,11 @@ export class ReceiptEditorPage {
       const existing = el.content?.trim() ?? '';
       const merged = existing ? `${existing}\n${urls.join('\n')}` : urls.join('\n');
       this.layoutService.updateElement(el.id, { content: merged });
+      this.toast.success('toast.imageUploaded');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Upload failed.';
       this.uploadError.set(msg);
+      this.toast.error('toast.imageUploadFailed');
       console.error('Image upload failed:', err);
     } finally {
       this.uploadingFor.set(null);

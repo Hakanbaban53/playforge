@@ -10,7 +10,6 @@ import {
   computeImageStyles,
   computeImageWrapperStyles,
   parseImageSources,
-  getStyleValue,
   computeTaxAmount,
 } from '../../core/utils/receipt-utils';
 
@@ -36,6 +35,9 @@ import {
           }
           @case ('meta') {
             <div class="r-block r-meta">
+              <div class="r-meta__heading">
+                {{ (invoice().meta.docType === 'quote' ? 'quote.quoteHeading' : 'quote.invoiceHeading') | translate }}
+              </div>
               <div class="r-meta__num">{{ invoice().meta.invoiceNumber }}</div>
               <div class="r-meta__date">{{ 'invoice.issued' | translate }} {{ invoice().meta.issueDate }}</div>
               @if (invoice().meta.dueDate) {
@@ -61,9 +63,9 @@ import {
               <thead>
                 <tr>
                   <th>{{ 'invoice.item' | translate }}</th>
-                  <th class="r-table__num">{{ 'common.quantity' | translate }}</th>
-                  <th class="r-table__num">{{ 'invoice.unitPrice' | translate }}</th>
-                  <th class="r-table__num">{{ 'common.total' | translate }}</th>
+                  <th class="r-table__num r-table__qty">{{ 'common.quantity' | translate }}</th>
+                  <th class="r-table__num r-table__price">{{ 'invoice.unitPrice' | translate }}</th>
+                  <th class="r-table__num r-table__total">{{ 'common.total' | translate }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,7 +81,12 @@ import {
                           />
                         }
                         <div>
-                          <div class="r-cell__name">{{ line.name }}</div>
+                          <div class="r-cell__name">
+                            {{ line.name }}
+                            @if (line.discount && line.discount.value > 0) {
+                              <span class="r-cell__discount">−{{ line.discount.type === 'percent' ? line.discount.value + '%' : (line.discount.value | money: invoice().meta.currency) }}</span>
+                            }
+                          </div>
                           <div class="r-cell__code mono">{{ line.code }}</div>
                           @if (line.size) {
                             <div class="r-cell__size">{{ 'invoice.size' | translate }} {{ line.size }}</div>
@@ -125,6 +132,15 @@ import {
           @case ('text') {
             <div class="r-block r-text" [ngStyle]="textStyles(el)">
               <pre>{{ el.content }}</pre>
+            </div>
+          }
+          @case ('notes') {
+            <div class="r-block r-text r-notes" [ngStyle]="textStyles(el)">
+              @if (invoice().meta.notes) {
+                <pre>{{ invoice().meta.notes }}</pre>
+              } @else {
+                <pre class="r-notes__placeholder">{{ 'invoice.notesPlaceholder' | translate }}</pre>
+              }
             </div>
           }
           @case ('image') {
@@ -178,12 +194,22 @@ import {
       white-space: pre-wrap;
       line-height: 1.4;
     }
+    .r-notes {
+      border-top: 1px dashed #e6ebef;
+      padding-top: 10px;
+      margin-top: 4px;
+    }
+    .r-notes__placeholder {
+      color: #9aa6af;
+      font-style: italic;
+    }
     .r-meta {
       font-size: 11px;
       color: #6b7782;
     }
-    .r-meta__num { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4b5560; }
-    .r-meta__date { margin-top: 2px; }
+    .r-meta__heading { font-size: 22px; font-weight: 700; color: #0f6638; letter-spacing: 0.08em; margin-bottom: 4px; text-align: right; }
+    .r-meta__num { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4b5560; text-align: right; }
+    .r-meta__date { margin-top: 2px; text-align: right; }
     .r-billto {
       background: #f8fafb;
       border-radius: 4px;
@@ -195,13 +221,17 @@ import {
     .r-billto__line { font-size: 11px; color: #4b5560; margin-top: 1px; }
     .r-billto__addr { font-family: inherit; font-size: 11px; margin: 4px 0 0; white-space: pre-wrap; color: #6b7782; }
 
-    .r-table { width: 100%; border-collapse: collapse; break-inside: avoid; page-break-inside: avoid; }
-    .r-table th, .r-table td { padding: 8px 10px; border-bottom: 1px solid #e6ebef; text-align: left; font-size: 11px; vertical-align: top; }
+    .r-table { width: 100%; border-collapse: collapse; break-inside: avoid; page-break-inside: avoid; table-layout: fixed; }
+    .r-table th, .r-table td { padding: 8px 10px; border-bottom: 1px solid #e6ebef; text-align: left; font-size: 11px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
     .r-table th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7782; background: #f8fafb; }
     .r-table__num { text-align: right; }
+    .r-table__qty { width: 10%; }
+    .r-table__price { width: 18%; }
+    .r-table__total { width: 18%; }
 
     .r-cell { display: flex; gap: 10px; align-items: flex-start; }
     .r-cell__name { font-weight: 600; font-size: 11px; }
+    .r-cell__discount { display: inline-block; font-size: 9px; font-weight: 700; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
     .r-cell__code { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6b7782; margin-top: 1px; }
     .r-cell__size { font-size: 10px; color: #6b7782; margin-top: 1px; }
     .r-cell__parts { font-size: 9px; color: #9aa6af; margin-top: 4px; line-height: 1.4; }
@@ -297,9 +327,5 @@ export class ReceiptPreviewComponent {
 
   imageWrapperStyles(el: LayoutElement): Record<string, string> {
     return computeImageWrapperStyles(el);
-  }
-
-  getStyle(el: LayoutElement, key: string, fallback: string): string {
-    return getStyleValue(el, key as never, fallback);
   }
 }

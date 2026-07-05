@@ -1,6 +1,6 @@
 {
   "name": "playforge",
-  "version": "0.0.0",
+  "version": "0.1.1",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -9,6 +9,7 @@
     "test": "ng test",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "icons": "node scripts/generate-icons.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

@@ -24,7 +24,6 @@ export class ImageResolverService {
 
   /** Allow explicit adapter injection (used by tests). */
   constructor(storage?: FileStorageAdapter) {
-    // Allow explicit adapter injection (used by tests).
     this.storage = storage ?? inject(FileStorageAdapter);
   }
 

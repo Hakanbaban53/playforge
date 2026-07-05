@@ -1,7 +1,7 @@
 <div class="shell" [class.shell--mobile]="isMobile()" [class.shell--collapsed]="sidebarCollapsed() && !isMobile()">
   @if (isMobile()) {
     <header class="mobile-topbar">
-      <button type="button" class="mobile-topbar__hamburger" (click)="toggleSidebar()" aria-label="Toggle menu">
+      <button type="button" class="mobile-topbar__hamburger" (click)="toggleSidebar()" [attr.aria-label]="'nav.toggleMenu' | translate">
         <app-icon name="menu" [size]="22" />
       </button>
       <span class="mobile-topbar__title">{{ title }}</span>
@@ -15,7 +15,7 @@
   }
 
   @if (isMobile() && mobileDrawerOpen()) {
-    <div class="mobile-backdrop" (click)="closeBackdrop()"></div>
+    <div class="mobile-backdrop" (click)="closeBackdrop()" role="presentation"></div>
   }
 
   <aside
@@ -25,7 +25,16 @@
   >
     <!-- Brand area with hover-to-reveal collapse toggle -->
     <div class="sidebar__brand-wrapper">
-      <div class="sidebar__brand" role="button" tabindex="0" (click)="!isMobile() && toggleSidebar()">
+      <div
+        class="sidebar__brand"
+        role="button"
+        tabindex="0"
+        (click)="!isMobile() && toggleSidebar()"
+        (keydown.enter)="!isMobile() && toggleSidebar()"
+        (keydown.space)="!isMobile() && toggleSidebar()"
+        [attr.aria-label]="'nav.toggleSidebar' | translate"
+        [attr.aria-expanded]="!sidebarCollapsed()"
+      >
         <div class="brand-mark">
           <app-icon class="brand-mark__default" name="inventory_2" [size]="22" />
           @if (!isMobile()) {
@@ -44,7 +53,7 @@
         }
       </div>
       @if (isMobile()) {
-        <button type="button" class="sidebar__close-btn" (click)="closeMobileDrawer()" aria-label="Close menu">
+        <button type="button" class="sidebar__close-btn" (click)="closeMobileDrawer()" [attr.aria-label]="'nav.closeMenu' | translate">
           <app-icon name="close" [size]="20" />
         </button>
       }
@@ -79,7 +88,7 @@
       <div class="sidebar__footer">
         <div class="version-pill">
           <app-icon name="tag" [size]="14" />
-          <span>v0.1.0</span>
+          <span>v{{ version }}</span>
         </div>
       </div>
     }
@@ -89,3 +98,6 @@
     <router-outlet />
   </main>
 </div>
+
+<app-toaster />
+

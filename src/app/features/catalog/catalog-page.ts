@@ -4,6 +4,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { CatalogService } from '../../core/services/catalog.service';
 import { ConfiguratorService } from '../../core/services/configurator.service';
 import { InvoiceService } from '../../core/services/invoice.service';
+import { FavoritesService } from '../../core/services/favorites.service';
+import { ToastService } from '../../core/services/toast.service';
 import { ProductCategory } from '../../core/models/catalog.model';
 import { lineFromResolved } from '../../core/models/invoice.model';
 import { IconComponent } from '../../shared/components/icon.component';
@@ -35,6 +37,8 @@ export class CatalogPage {
   private readonly catalog = inject(CatalogService);
   private readonly configurator = inject(ConfiguratorService);
   private readonly invoice = inject(InvoiceService);
+  private readonly favorites = inject(FavoritesService);
+  private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
   readonly families = this.catalog.families;
@@ -45,6 +49,9 @@ export class CatalogPage {
   readonly activeCategory = signal<ProductCategory | null>(null);
   /** Free-text query (matched against name, sku, tags). */
   readonly search = signal('');
+  readonly onlyFavorites = signal(false);
+
+  readonly fav = this.favorites;
 
   readonly categories: ProductCategory[] = [
     'slide',
@@ -61,8 +68,11 @@ export class CatalogPage {
   readonly filtered = computed(() => {
     const q = this.search().toLowerCase().trim();
     const cat = this.activeCategory();
+    const favOnly = this.onlyFavorites();
+    const favIds = this.favorites.ids();
     return this.resolved().filter((p) => {
       if (cat && p.category !== cat) return false;
+      if (favOnly && !favIds.has(p.variantId)) return false;
       if (!q) return true;
       const haystack =
         `${p.name} ${p.sku} ${p.tags.join(' ')} ${p.size ?? ''}`.toLowerCase();
@@ -87,6 +97,17 @@ export class CatalogPage {
     this.search.set(v);
   }
 
+  toggleFavoritesOnly(): void {
+    this.onlyFavorites.update((v) => !v);
+  }
+
+  toggleFavorite(variantId: string, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const nowFav = this.favorites.toggle(variantId);
+    this.toast.success(nowFav ? 'toast.favoriteAdded' : 'toast.favoriteRemoved');
+  }
+
   primaryImage(urls: { url: string; isPrimary: boolean }[]): string {
     return getPrimaryImageUrl(urls);
   }
@@ -101,6 +122,7 @@ export class CatalogPage {
     if (!resolved) return;
     const line = lineFromResolved(resolved, 1);
     this.invoice.addLine(line);
+    this.toast.success('toast.addedToInvoice');
   }
 
   variantCount(familyId: string): number {

@@ -1,15 +1,30 @@
 <section class="page">
   <header class="page__head">
     <div>
-      <h1>{{ 'invoice.title' | translate }}</h1>
+      <h1>
+        {{ 'invoice.title' | translate }}
+        <span class="doc-badge" [class.doc-badge--quote]="active().meta.docType === 'quote'">
+          {{ (active().meta.docType === 'quote' ? 'quote.quote' : 'quote.invoice') | translate }}
+        </span>
+      </h1>
       <p class="muted">
         {{ 'invoice.subtitle' | translate }}
       </p>
     </div>
     <div class="head-actions">
+      @if (active().meta.docType === 'quote') {
+        <app-button variant="secondary" size="md" (click)="convertToInvoice()">
+          <app-icon name="auto_awesome" [size]="14" />
+          {{ 'quote.convertToInvoice' | translate }}
+        </app-button>
+      }
       <app-button variant="secondary" size="md" (click)="openReceiptEditor()">
         <app-icon name="layers" [size]="14" />
         {{ 'invoice.openEditor' | translate }}
+      </app-button>
+      <app-button variant="ghost" size="md" (click)="save()" [disabled]="active().lines.length === 0">
+        <app-icon name="save" [size]="14" />
+        {{ 'common.save' | translate }}
       </app-button>
       <app-button variant="ghost" size="md" (click)="clearAll()" [disabled]="active().lines.length === 0">
         <app-icon name="delete" [size]="14" />
@@ -49,6 +64,13 @@
       <section class="surface-card card">
         <h3 class="card__title">{{ 'invoice.details' | translate }}</h3>
         <div class="form-grid">
+          <label class="field">
+            <span>{{ 'quote.label' | translate }}</span>
+            <select [value]="active().meta.docType" (change)="updateMeta($event, 'docType')">
+              <option value="invoice">{{ 'quote.invoice' | translate }}</option>
+              <option value="quote">{{ 'quote.quote' | translate }}</option>
+            </select>
+          </label>
           <label class="field">
             <span>{{ 'invoice.invoiceNumber' | translate }}</span>
             <input
@@ -137,9 +159,7 @@
 
       <!-- Line items -->
       <section class="surface-card card">
-        <div class="card__head">
-          <h3 class="card__title">{{ 'invoice.lineItems' | translate: { count: active().lines.length } }}</h3>
-        </div>
+        <h3 class="card__title">{{ 'invoice.lineItems' | translate: { count: active().lines.length } }}</h3>
 
         @if (active().lines.length === 0) {
           <div class="empty-lines">
@@ -149,69 +169,104 @@
         } @else {
           <div class="lines">
             @for (line of active().lines; track line.id) {
-              <article class="line">
-                <div class="line__media">
-                  @if (line.imageUrl) {
-                    <app-resolved-img [src]="line.imageUrl" [alt]="line.name" imgClass="line__media-img" />
-                  } @else {
-                    <div class="line__media-empty">
-                      <app-icon name="image" [size]="18" />
-                    </div>
-                  }
-                </div>
-
-                <div class="line__main">
-                  <div class="line__head">
-                    <h4>{{ line.name }}</h4>
-                    <span class="line__code mono">{{ line.code }}</span>
-                    @if (line.size) {
-                      <span class="line__size">{{ line.size }}</span>
+              <article class="line-item">
+                <!-- Row 1: media + product info + remove -->
+                <div class="line-item__top">
+                  <div class="line-item__media">
+                    @if (line.imageUrl) {
+                      <app-resolved-img [src]="line.imageUrl" [alt]="line.name" imgClass="line-item__media-img" />
+                    } @else {
+                      <div class="line-item__media-empty">
+                        <app-icon name="image" [size]="18" />
+                      </div>
                     }
                   </div>
 
-                  @if (line.parts.length > 0) {
-                    <details class="line__parts">
-                      <summary>{{ 'invoice.partsIncluded' | translate: { count: line.parts.length } }}</summary>
-                      <ul>
-                        @for (part of line.parts; track part.partId) {
-                          <li>
-                            <span class="line__part-qty">×{{ part.quantity }}</span>
-                            <span class="line__part-name">{{ part.name }}</span>
-                            <span class="line__part-sku mono">{{ part.sku }}</span>
-                            <span class="line__part-price">{{ part.unitPrice | money: active().meta.currency }}</span>
-                          </li>
-                        }
-                      </ul>
-                    </details>
-                  }
+                  <div class="line-item__info">
+                    <div class="line-item__head">
+                      <h4>{{ line.name }}</h4>
+                      <span class="line-item__code mono">{{ line.code }}</span>
+                      @if (line.size) {
+                        <span class="line-item__size">{{ line.size }}</span>
+                      }
+                    </div>
 
-                  <div class="line__price">
-                    {{ 'invoice.unitPrice' | translate }}: {{ line.unitPrice | money: active().meta.currency }}
+                    @if (line.parts.length > 0) {
+                      <details class="line-item__parts">
+                        <summary>{{ 'invoice.partsIncluded' | translate: { count: line.parts.length } }}</summary>
+                        <ul>
+                          @for (part of line.parts; track part.partId) {
+                            <li>
+                              <span class="line-item__part-qty">×{{ part.quantity }}</span>
+                              <span class="line-item__part-name">{{ part.name }}</span>
+                              <span class="line-item__part-sku mono">{{ part.sku }}</span>
+                              <span class="line-item__part-price">{{ part.unitPrice | money: active().meta.currency }}</span>
+                            </li>
+                          }
+                        </ul>
+                      </details>
+                    }
+                  </div>
+
+                  <button
+                    type="button"
+                    class="line-item__remove"
+                    (click)="removeLine(line.id)"
+                    [attr.aria-label]="'common.remove' | translate"
+                  >
+                    <app-icon name="delete" [size]="16" />
+                  </button>
+                </div>
+
+                <!-- Row 2: controls (qty, discount, unit price, total) — wraps -->
+                <div class="line-item__controls">
+                  <div class="ctrl">
+                    <span class="ctrl__label">{{ 'common.quantity' | translate }}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      class="ctrl__input ctrl__input--qty"
+                      [value]="line.quantity"
+                      (input)="updateLineQty(line.id, $event)"
+                    />
+                  </div>
+
+                  <div class="ctrl">
+                    <span class="ctrl__label">{{ 'discount.label' | translate }}</span>
+                    <div class="ctrl__discount">
+                      <select
+                        class="ctrl__select"
+                        [value]="line.discount?.type ?? 'none'"
+                        (change)="updateDiscountType(line.id, $event)"
+                      >
+                        <option value="none">{{ 'discount.none' | translate }}</option>
+                        <option value="percent">%</option>
+                        <option value="fixed">¤</option>
+                      </select>
+                      @if (line.discount) {
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          class="ctrl__input ctrl__input--discount"
+                          [value]="line.discount.value"
+                          (input)="updateDiscountValue(line.id, $event)"
+                          [attr.aria-label]="'discount.value' | translate"
+                        />
+                      }
+                    </div>
+                  </div>
+
+                  <div class="ctrl ctrl--price">
+                    <span class="ctrl__label">{{ 'invoice.unitPrice' | translate }}</span>
+                    <span class="ctrl__value">{{ line.unitPrice | money: active().meta.currency }}</span>
+                  </div>
+
+                  <div class="ctrl ctrl--total">
+                    <span class="ctrl__label">{{ 'common.total' | translate }}</span>
+                    <span class="ctrl__value ctrl__value--strong">{{ lineTotal(line) | money: active().meta.currency }}</span>
                   </div>
                 </div>
-
-                <div class="line__qty">
-                  <span class="field-label">{{ 'common.quantity' | translate }}</span>
-                  <input
-                    type="number"
-                    min="1"
-                    [value]="line.quantity"
-                    (input)="updateLineQty(line.id, $event)"
-                  />
-                </div>
-
-                <div class="line__total">
-                  {{ lineTotal(line) | money: active().meta.currency }}
-                </div>
-
-                <button
-                  type="button"
-                  class="line__remove"
-                  (click)="removeLine(line.id)"
-                  [attr.aria-label]="'common.remove' | translate"
-                >
-                  <app-icon name="delete" [size]="16" />
-                </button>
               </article>
             }
           </div>
@@ -233,7 +288,7 @@
         } @else {
           <div class="taxes">
             @for (tax of active().meta.taxes; track tax.id) {
-              <div class="tax-row">
+              <div class="tax-item">
                 <label class="toggle">
                   <input
                     type="checkbox"
@@ -244,12 +299,13 @@
                 </label>
                 <input
                   type="text"
-                  class="tax-name"
+                  class="tax-item__name"
                   [value]="tax.name"
                   (input)="updateTaxName(tax.id, $event)"
                   [placeholder]="'invoice.taxName' | translate"
                 />
                 <select
+                  class="tax-item__type"
                   [value]="tax.type"
                   (change)="updateTaxType(tax.id, $event)"
                 >
@@ -258,18 +314,18 @@
                 </select>
                 <input
                   type="number"
-                  class="tax-value"
+                  class="tax-item__value"
                   [value]="tax.value"
                   (input)="updateTaxValue(tax.id, $event)"
                   min="0"
                   step="0.01"
                 />
-                <span class="tax-amount mono">
+                <span class="tax-item__amount mono">
                   {{ taxAmount(tax) | money: active().meta.currency }}
                 </span>
                 <button
                   type="button"
-                  class="tax-remove"
+                  class="tax-item__remove"
                   (click)="removeTax(tax.id)"
                   [attr.aria-label]="'common.remove' | translate"
                 >

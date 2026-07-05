@@ -19,6 +19,7 @@ export type LayoutElementType =
   | 'meta'
   | 'visuals'
   | 'totals'
+  | 'notes'
   | 'text'
   | 'image'
   | 'divider';
@@ -132,6 +133,14 @@ export function buildDefaultLayout(_translateHeaderKey: string, _translateTermsK
       visible: true,
       fixed: true,
       labelKey: 'receipt.elements.totals',
+    },
+    {
+      id: 'notes',
+      type: 'notes',
+      visible: true,
+      fixed: true,
+      labelKey: 'receipt.elements.notes',
+      styles: { ...DEFAULT_TEXT_STYLES },
     },
     {
       id: 'terms',

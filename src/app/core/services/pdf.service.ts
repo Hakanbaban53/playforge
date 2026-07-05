@@ -79,7 +79,6 @@ export class PdfService {
       });
 
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
 
       for (let i = 0; i < pages.length; i++) {
         if (i > 0) pdf.addPage();
@@ -110,10 +109,8 @@ export class PdfService {
           // Add canvas to the PDF page, scaled to fit the page width.
           const imgWidth = pageWidth;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          // If the content is shorter than the page, center it vertically.
-          const yOffset = imgHeight < pageHeight ? 0 : 0;
           const imgData = canvas.toDataURL('image/jpeg', 0.92);
-          pdf.addImage(imgData, 'JPEG', 0, yOffset, imgWidth, imgHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
         } finally {
           document.body.removeChild(pageContainer);
         }
@@ -140,8 +137,12 @@ export class PdfService {
 
     for (const el of elements) {
       const height = (el as HTMLElement).offsetHeight;
-      const marginTop = parseInt(getComputedStyle(el as HTMLElement).marginBottom) || 0;
-      const totalHeight = height + marginTop;
+      // Count both top + bottom margins — counting only one under-counts
+      // elements and can split them across pages.
+      const style = getComputedStyle(el);
+      const marginTotal =
+        (parseInt(style.marginTop) || 0) + (parseInt(style.marginBottom) || 0);
+      const totalHeight = height + marginTotal;
 
       if (currentHeight + totalHeight > PdfService.PAGE_HEIGHT_PX && currentPage.length > 0) {
         // Start a new page.

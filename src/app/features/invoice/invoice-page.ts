@@ -8,7 +8,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { InvoiceService } from '../../core/services/invoice.service';
 import { PdfService } from '../../core/services/pdf.service';
 import { ReceiptLayoutService } from '../../core/services/receipt-layout.service';
-import { lineTotal } from '../../core/models/invoice.model';
+import { ToastService } from '../../core/services/toast.service';
+import { lineTotal, InvoiceMeta } from '../../core/models/invoice.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
@@ -40,12 +41,10 @@ export class InvoicePage {
   private readonly pdf = inject(PdfService);
   private readonly router = inject(Router);
   private readonly receiptLayout = inject(ReceiptLayoutService);
+  private readonly toast = inject(ToastService);
 
   readonly active = this.invoiceService.active;
   readonly subtotal = this.invoiceService.subtotal;
-  readonly activeTaxes = this.invoiceService.activeTaxes;
-  readonly totalTax = this.invoiceService.totalTax;
-  readonly grandTotal = this.invoiceService.grandTotal;
   readonly layout = this.receiptLayout.layout;
 
   readonly isGeneratingPdf = signal(false);
@@ -65,18 +64,13 @@ export class InvoicePage {
     void this.router.navigate(['/receipt-editor']);
   }
 
-  /** Filter layout to visible items only (used by the renderer). */
-  visibleLayout() {
-    return this.layout().filter((el) => el.visible);
-  }
-
   // ---------------------------------------------------------------------------
   // Meta + line mutations
   // ---------------------------------------------------------------------------
 
-  updateMeta(event: Event, key: 'customerName' | 'customerEmail' | 'customerAddress' | 'customerTaxId' | 'invoiceNumber' | 'issueDate' | 'dueDate' | 'seller' | 'notes' | 'currency' | 'paperSize'): void {
+  updateMeta(event: Event, key: keyof InvoiceMeta): void {
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
-    this.invoiceService.updateMeta({ [key]: value } as never);
+    this.invoiceService.updateMeta({ [key]: value });
   }
 
   updateLineQty(lineId: string, event: Event): void {
@@ -84,12 +78,39 @@ export class InvoicePage {
     this.invoiceService.updateLineQuantity(lineId, value);
   }
 
+  updateDiscountType(lineId: string, event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    if (value === 'none') {
+      this.invoiceService.updateLineDiscount(lineId, undefined);
+      return;
+    }
+    const line = this.active().lines.find((l) => l.id === lineId);
+    const existing = line?.discount;
+    this.invoiceService.updateLineDiscount(lineId, {
+      type: value as 'percent' | 'fixed',
+      value: existing?.value ?? 0,
+    });
+  }
+
+  updateDiscountValue(lineId: string, event: Event): void {
+    const line = this.active().lines.find((l) => l.id === lineId);
+    if (!line?.discount) return;
+    const raw = Number((event.target as HTMLInputElement).value);
+    const value = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+    this.invoiceService.updateLineDiscount(lineId, {
+      type: line.discount.type,
+      value,
+    });
+  }
+
   removeLine(lineId: string): void {
     this.invoiceService.removeLine(lineId);
+    this.toast.info('toast.lineRemoved');
   }
 
   clearAll(): void {
     this.invoiceService.clearLines();
+    this.toast.info('toast.linesCleared');
   }
 
   toggleTax(taxId: string, enabled: boolean): void {
@@ -121,6 +142,12 @@ export class InvoicePage {
 
   save(): void {
     this.invoiceService.saveAndReset();
+    this.toast.success('toast.invoiceSaved');
+  }
+
+  convertToInvoice(): void {
+    this.invoiceService.convertToInvoice();
+    this.toast.success('toast.convertedToInvoice');
   }
 
   // ---------------------------------------------------------------------------
@@ -136,11 +163,12 @@ export class InvoicePage {
       const fileName = meta.invoiceNumber || 'invoice';
       const pageCount = await this.pdf.downloadPdf(fileName);
       this.lastPageCount.set(pageCount);
+      this.toast.success('toast.pdfGenerated', { count: pageCount });
     } catch (err) {
       console.error('PDF generation failed:', err);
-      this.pdfError.set(
-        err instanceof Error ? err.message : 'Failed to generate PDF.',
-      );
+      const msg = err instanceof Error ? err.message : 'Failed to generate PDF.';
+      this.pdfError.set(msg);
+      this.toast.error('toast.pdfFailed');
     } finally {
       this.isGeneratingPdf.set(false);
     }

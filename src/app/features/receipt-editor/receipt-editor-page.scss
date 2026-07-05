@@ -36,12 +36,18 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  ::ng-deep app-button {
+    flex: 0 1 auto;
+    min-width: 0;
   }
 }
 
 .layout {
   display: grid;
-  grid-template-columns: 460px 1fr;
+  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
   gap: 22px;
   align-items: flex-start;
 }
@@ -76,7 +82,7 @@
 
 .layout-item {
   display: grid;
-  grid-template-columns: 20px 20px 1fr 26px 26px;
+  grid-template-columns: 20px 20px minmax(0, 1fr) 26px 26px;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -251,7 +257,7 @@
 
 .e-styles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   margin-top: 12px;
   padding-top: 12px;
@@ -383,154 +389,41 @@
 .preview-pane {
   position: sticky;
   top: 14px;
+  /* Don't let the preview pane grow taller than the viewport — its
+   * inner scroll container handles overflow. `align-self: flex-start`
+   * would be redundant since the parent grid uses `align-items: flex-start`. */
+  min-width: 0;
 }
 
 .preview-scroll {
-  max-height: calc(100vh - 180px);
+  /* Leave room for the pane header (≈30px) + page padding (≈48px top) +
+   * a bit of breathing room. `min-height: 0` is required for flex/grid
+   * children to actually constrain their height. */
+  max-height: calc(100vh - 140px);
+  min-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px;
-}
+  /* Inert scrollbar styling so it doesn't compete with the preview content. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-300) transparent;
 
-/* =================== Receipt sheet (preview) ===================
- * Always white, even in dark mode — the PDF/customer-facing receipt
- * should always be on white paper.
- */
-.invoice-sheet {
-  background: #ffffff;
-  margin: 0 auto;
-  padding: 32px;
-  font-size: 12px;
-  color: #1f242b;
-  box-shadow: var(--shadow-md);
-  border-radius: 4px;
-  width: 210mm;
-  min-height: 200mm;
-
-  &.sheet--a5 { width: 148mm; min-height: 200mm; padding: 22px; font-size: 11px; }
-  &.sheet--letter { width: 216mm; min-height: 279mm; }
-}
-
-.r-block { margin-bottom: 14px; }
-
-.r-header pre, .r-text pre {
-  font-family: var(--font-sans);
-  margin: 0;
-  white-space: pre-wrap;
-  line-height: 1.4;
-}
-
-.r-meta {
-  &__num {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: #6b7782;
-  }
-  &__date {
-    font-size: 11px;
-    color: #6b7782;
-    margin-top: 2px;
-  }
-}
-
-.r-table {
-  width: 100%;
-  border-collapse: collapse;
-
-  th, td {
-    text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid #e6ebef;
-  }
-  th {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #6b7782;
-    background: #f8fafb;
-  }
-  &__num { text-align: right; }
-}
-
-.r-cell {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-
-  &__img {
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
+  &::-webkit-scrollbar { width: 8px; }
+  &::-webkit-scrollbar-thumb {
+    background: var(--surface-300);
     border-radius: 4px;
-    flex-shrink: 0;
-    background: #f1f5f7;
   }
-
-  &__name { font-weight: 600; font-size: 12px; color: #1f242b; }
-  &__code { font-size: 10px; color: #6b7782; margin-top: 1px; }
+  &::-webkit-scrollbar-track { background: transparent; }
 }
 
-.r-empty {
-  text-align: center;
-  color: #6b7782;
-  padding: 24px !important;
-}
-
-.r-image {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.r-visuals {
-  display: grid;
-  gap: 12px;
-
-  img,
-  ::ng-deep .r-visuals__img {
-    width: 100%;
-    height: 150px;
-    object-fit: cover;
-    border-radius: 4px;
-    background: #f1f5f7;
-  }
-}
-
-.r-divider {
-  border: none;
-  border-top: 1px solid #e6ebef;
-  margin: 14px 0;
-}
-
-.r-totals {
-  margin-top: 18px;
-  margin-left: auto;
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  &__row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #4b5560;
-
-    &--grand {
-      border-top: 2px solid #d2dade;
-      margin-top: 6px;
-      padding-top: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      color: #1f242b;
-    }
-  }
-}
-
-@media (max-width: 1200px) {
-  .layout { grid-template-columns: 1fr; }
+@media (max-width: 1024px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
   .preview-pane { position: static; }
-  .invoice-sheet { width: 100% !important; min-height: auto !important; }
+  /* On tablet, give the preview a fixed max-height so it doesn't push
+   * the page footer off-screen — the user can scroll inside the pane. */
+  .preview-scroll {
+    max-height: 70vh;
+  }
 }
 
 @media (max-width: 768px) {
@@ -617,22 +510,10 @@
   }
 
   .preview-scroll {
-    max-height: none;
+    /* On mobile, the preview pane still needs to scroll internally —
+     * otherwise the long preview pushes the page footer off-screen. */
+    max-height: 60vh;
+    min-height: 240px;
   }
 
-  .invoice-sheet {
-    padding: 20px 16px;
-    font-size: 11px;
-  }
-
-  .r-table {
-    th, td {
-      padding: 6px 4px;
-      font-size: 10px;
-    }
-  }
-
-  .r-totals {
-    width: 100%;
-  }
 }

@@ -27,9 +27,8 @@ export class ExportPage {
   private readonly invoiceService = inject(InvoiceService);
 
   readonly families = this.catalog.families;
-  readonly variantCount = this.catalog.variants().length;
-  readonly savedInvoiceCount = this.invoiceService.listSaved().length;
-  readonly activeLineCount = this.invoiceService.active().lines.length;
+  readonly savedInvoiceCount = computed(() => this.invoiceService.listSaved().length);
+  readonly activeLineCount = computed(() => this.invoiceService.active().lines.length);
 
   /** Selected family codes for export. Empty = export all. */
   readonly selectedCodes = signal<Set<string>>(new Set());

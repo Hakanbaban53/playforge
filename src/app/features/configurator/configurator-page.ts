@@ -1,9 +1,9 @@
 import { Component, computed, inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { CatalogService } from '../../core/services/catalog.service';
 import { ConfiguratorService } from '../../core/services/configurator.service';
 import { InvoiceService } from '../../core/services/invoice.service';
+import { ToastService } from '../../core/services/toast.service';
 import { lineFromConfiguration } from '../../core/models/invoice.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
@@ -41,7 +41,7 @@ export class ConfiguratorPage {
   private readonly catalog = inject(CatalogService);
   private readonly configurator = inject(ConfiguratorService);
   private readonly invoice = inject(InvoiceService);
-  private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   readonly families = this.catalog.families;
   readonly family = this.configurator.family;
@@ -151,7 +151,7 @@ export class ConfiguratorPage {
       undefined,
     );
     this.invoice.addLine(line);
-    void this.router.navigate(['/invoice']);
+    this.toast.success('toast.addedToInvoice');
   }
 
   primaryImage(urls: { url: string; isPrimary: boolean }[]): string {

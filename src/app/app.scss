@@ -6,17 +6,17 @@
 
 .shell {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px minmax(0, 1fr);
   height: 100vh;
   transition: grid-template-columns var(--motion-base);
 
   &--collapsed {
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 72px minmax(0, 1fr);
   }
 
   /* Mobile: single column, sidebar is an overlay drawer */
   &--mobile {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
   }
 }
@@ -90,12 +90,12 @@
   position: relative;
   box-shadow: var(--shadow-md);
   z-index: 100;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 
   &__brand-wrapper {
     position: relative;
     padding: 4px 8px 22px;
+    flex-shrink: 0;
   }
 
   &__brand {
@@ -124,17 +124,28 @@
   }
 
   &__nav {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
     margin-top: 8px;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    &::-webkit-scrollbar-track { background: transparent; }
   }
 
   &__footer {
     padding-top: 16px;
-    margin-top: auto;
+    margin-top: 12px;
+    flex-shrink: 0;
   }
 
   /* Mobile: fixed drawer that slides in from the left */
@@ -331,52 +342,6 @@
   padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.switcher {
-  margin-bottom: 10px;
-
-  &__label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--sidebar-text-subtle);
-    margin-bottom: 4px;
-  }
-
-  &__buttons {
-    display: flex;
-    gap: 3px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 6px;
-    padding: 3px;
-  }
-
-  button {
-    flex: 1;
-    border: none;
-    background: transparent;
-    color: var(--sidebar-text-muted);
-    font-size: 11px;
-    font-weight: 600;
-    padding: 5px 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background var(--motion-fast), color var(--motion-fast);
-
-    &:hover {
-      color: #fff;
-    }
-  }
-
-  &__btn--active {
-    background: var(--brand-500);
-    color: #fff !important;
-    box-shadow: 0 2px 6px rgba(31, 157, 86, 0.4);
-  }
 }
 
 .content {

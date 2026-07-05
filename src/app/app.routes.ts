@@ -57,6 +57,12 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'customers',
+    title: 'Customers · PlayForge',
+    loadComponent: () =>
+      import('./features/customers/customers-page').then((m) => m.CustomersPage),
+  },
+  {
     path: 'settings',
     title: 'Settings · PlayForge',
     loadComponent: () =>

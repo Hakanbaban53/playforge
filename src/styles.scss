@@ -85,6 +85,32 @@
 
   --app-max-width: 1480px;
 
+  /* ---- Layout breakpoints ----
+   * Centralized so pages stop hard-coding their own magic numbers.
+   *   --bp-mobile    : single-column phone layout kicks in
+   *   --bp-tablet    : two-column grids collapse to one column
+   *   --bp-desktop   : the "comfortable" two-column desktop width
+   *   --bp-wide      : wide monitor; preview panes get their full max width
+   *
+   * Use them as `@media (max-width: var(--bp-tablet))` — note that CSS
+   * custom properties are NOT directly usable in @media queries (they
+   * require @custom-media + PostCSS, which we don't ship), so these are
+   * reference values; the @media blocks below still hard-code the px
+   * values for now. They are documented here so future changes have a
+   * single source of truth to update. */
+  --bp-mobile: 768px;
+  --bp-tablet: 1024px;
+  --bp-desktop: 1280px;
+  --bp-wide: 1480px;
+
+  /* Sidebar widths (kept in sync with app.scss) */
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 72px;
+
+  /* Standard page padding */
+  --page-padding-x: 32px;
+  --page-padding-y: 28px;
+
   /* ---- App background (light) ---- */
   --app-bg:
     radial-gradient(1200px 600px at 110% -10%, rgba(31, 157, 86, 0.08), transparent 60%),
@@ -257,13 +283,6 @@ a:hover { text-decoration: underline; }
 button { font-family: inherit; }
 
 /* ---- Utility primitives (used app-wide) ---- */
-.app-container {
-  width: 100%;
-  max-width: var(--app-max-width);
-  margin: 0 auto;
-  padding: 0 var(--space-6);
-}
-
 .surface-card {
   background: var(--surface-0);
   border: 1px solid var(--surface-200);

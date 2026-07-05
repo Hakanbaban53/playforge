@@ -168,9 +168,7 @@ export class ExcelImportService {
     // Find the products sheet: try localized name for each supported lang,
     // fall back to the first sheet.
     const sheetName: string | undefined =
-      wb.SheetNames.find((n) =>
-        SUPPORTED_LANGS.some(() => this.isProductsSheetName(n)),
-      ) ?? wb.SheetNames[0];
+      wb.SheetNames.find((n) => this.isProductsSheetName(n)) ?? wb.SheetNames[0];
 
     const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
     if (!sheet) {
@@ -200,7 +198,7 @@ export class ExcelImportService {
       ]);
     }
 
-    const headerRow = (rows[0] as unknown[]).map((c) => String(c ?? '').trim());
+    const headerRow = (rows[0]).map((c) => String(c ?? '').trim());
     const colIndex = this.buildColumnIndex(headerRow);
 
     const errors: ImportRowError[] = [];
@@ -225,7 +223,7 @@ export class ExcelImportService {
     const dataRows = rows.slice(1);
     dataRows.forEach((rawRow, idx) => {
       const rowIndex = idx + 2;
-      const row = (rawRow as unknown[]).map((c) => (c == null ? '' : c));
+      const row = (rawRow).map((c) => (c == null ? '' : c));
       const draft = this.parseRow(row, colIndex, rowIndex);
       drafts.push(draft);
     });
@@ -532,10 +530,6 @@ export class ExcelImportService {
   // -------------------------------------------------------------------------
 
   /**
-   * Convert validated drafts into families & variants, then replace the
-   * catalog. Returns the count of newly-created families and variants.
-   */
-  /**
    * Generate a preview of what the import will do — which families will be
    * created vs updated, which variants will be created vs updated, and any
    * conflicts (duplicate SKUs within the file, same family name with
@@ -559,23 +553,32 @@ export class ExcelImportService {
     }
 
     // Track codes/SKUs seen within this file to detect intra-file duplicates.
+    // `firstIndexByCode` / `firstIndexBySku` cache the first occurrence of
+    // each key, so the second pass can do an O(1) lookup instead of the
+    // previous O(n²) `drafts.findIndex(...)` + `drafts.indexOf(d)` per row.
     const seenCodesInFile = new Map<string, number>();
     const seenSkusInFile = new Map<string, number>();
     const seenNamesInFile = new Map<string, string>();
+    const firstIndexByCode = new Map<string, number>();
+    const firstIndexBySku = new Map<string, number>();
 
-    // First pass: collect counts.
-    for (const d of drafts) {
+    // First pass: collect counts and first-occurrence indices.
+    drafts.forEach((d, idx) => {
       const codeKey = d.familyCode.toLowerCase();
       seenCodesInFile.set(codeKey, (seenCodesInFile.get(codeKey) ?? 0) + 1);
+      if (!firstIndexByCode.has(codeKey)) firstIndexByCode.set(codeKey, idx);
+
       const skuKey = `${codeKey}:${d.variantSku.toLowerCase()}`;
       seenSkusInFile.set(skuKey, (seenSkusInFile.get(skuKey) ?? 0) + 1);
+      if (!firstIndexBySku.has(skuKey)) firstIndexBySku.set(skuKey, idx);
+
       const existingName = seenNamesInFile.get(d.familyName.toLowerCase());
       if (existingName && existingName !== d.familyCode) {
         // Different code, same name — will be flagged as conflict.
       } else {
         seenNamesInFile.set(d.familyName.toLowerCase(), d.familyCode);
       }
-    }
+    });
 
     const rows: ImportPreviewRow[] = [];
     let newFamilies = 0;
@@ -589,31 +592,20 @@ export class ExcelImportService {
     const countedNewCodes = new Set<string>();
     const countedUpdatedCodes = new Set<string>();
 
-    for (const d of drafts) {
+    drafts.forEach((d, idx) => {
       const codeKey = d.familyCode.toLowerCase();
       const skuKey = `${codeKey}:${d.variantSku.toLowerCase()}`;
       const conflicts: string[] = [];
 
-      // Intra-file duplicate family code.
-      if ((seenCodesInFile.get(codeKey) ?? 0) > 1) {
-        const firstIdx = drafts.findIndex(
-          (x) => x.familyCode.toLowerCase() === codeKey,
-        );
-        if (drafts.indexOf(d) !== firstIdx) {
-          conflicts.push('duplicate_code_in_file');
-        }
+      // Intra-file duplicate family code (this row is a dup if it isn't the
+      // first occurrence).
+      if ((seenCodesInFile.get(codeKey) ?? 0) > 1 && firstIndexByCode.get(codeKey) !== idx) {
+        conflicts.push('duplicate_code_in_file');
       }
 
       // Intra-file duplicate variant SKU.
-      if ((seenSkusInFile.get(skuKey) ?? 0) > 1) {
-        const firstIdx = drafts.findIndex(
-          (x) =>
-            x.familyCode.toLowerCase() === codeKey &&
-            x.variantSku.toLowerCase() === d.variantSku.toLowerCase(),
-        );
-        if (drafts.indexOf(d) !== firstIdx) {
-          conflicts.push('duplicate_sku_in_file');
-        }
+      if ((seenSkusInFile.get(skuKey) ?? 0) > 1 && firstIndexBySku.get(skuKey) !== idx) {
+        conflicts.push('duplicate_sku_in_file');
       }
 
       // Same family name but different code (potential confusion).
@@ -666,7 +658,7 @@ export class ExcelImportService {
         selected: conflicts.length === 0, // auto-deselect conflicted rows
         conflicts,
       });
-    }
+    });
 
     return {
       rows,

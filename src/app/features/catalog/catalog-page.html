@@ -51,6 +51,20 @@
           </button>
         }
 
+        <h3 class="filters__title">{{ 'favorites.label' | translate }}</h3>
+        <button
+          type="button"
+          class="filter-chip filter-chip--favorite"
+          [class.filter-chip--active]="onlyFavorites()"
+          (click)="toggleFavoritesOnly()"
+        >
+          <app-icon [name]="onlyFavorites() ? 'star' : 'star_outline'" [size]="14" />
+          {{ 'favorites.showOnly' | translate }}
+          @if (fav.count() > 0) {
+            <span class="filter-chip__count">{{ fav.count() }}</span>
+          }
+        </button>
+
         <h3 class="filters__title">{{ 'catalog.families' | translate }}</h3>
         @for (family of families(); track family.id) {
           <div class="family-pill">
@@ -82,6 +96,16 @@
                 </div>
               }
               <span class="card__size">{{ product.size ?? '—' }}</span>
+              <button
+                type="button"
+                class="card__fav"
+                [class.card__fav--active]="fav.isFavorite(product.variantId)"
+                (click)="toggleFavorite(product.variantId, $event)"
+                [attr.aria-label]="'favorites.toggle' | translate"
+                [attr.aria-pressed]="fav.isFavorite(product.variantId)"
+              >
+                <app-icon [name]="fav.isFavorite(product.variantId) ? 'star' : 'star_outline'" [size]="18" />
+              </button>
             </div>
 
             <div class="card__body">

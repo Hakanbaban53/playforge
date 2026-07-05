@@ -9,16 +9,24 @@ export default tseslint.config(
       "dist/**",
       ".angular/**",
       "node_modules/**",
+      "scripts/**",
     ],
   },
   {
-    files: ["**/*.ts"],
+    files: ["src/**/*.ts"],
+    ignores: ["src/**/*.spec.ts"],
     extends: [
       eslint.configs.recommended,
-      ...tseslint.configs.recommended,
-      ...tseslint.configs.stylistic,
+      ...tseslint.configs.recommendedTypeChecked,
+      ...tseslint.configs.stylisticTypeChecked,
       ...angular.configs.tsRecommended,
     ],
+    languageOptions: {
+      parserOptions: {
+        project: "./tsconfig.app.json",
+        tsconfigDirName: import.meta.dirname,
+      },
+    },
     processor: angular.processInlineTemplates,
     rules: {
       "@angular-eslint/directive-selector": [
@@ -34,19 +42,32 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-deprecated": "error",
       "@angular-eslint/no-empty-lifecycle-method": "error",
       "@angular-eslint/use-lifecycle-interface": "error",
     },
   },
+  // Non-type-checked config for spec files.
   {
-    files: ["**/*.spec.ts", "**/image-resolver.service.ts"],
+    files: ["src/**/*.spec.ts"],
+    extends: [
+      eslint.configs.recommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      ...angular.configs.tsRecommended,
+    ],
     rules: {
       "@angular-eslint/prefer-inject": "off",
     },
   },
   {
-    files: ["**/*.html"],
+    files: ["src/**/image-resolver.service.ts"],
+    rules: {
+      "@angular-eslint/prefer-inject": "off",
+    },
+  },
+  {
+    files: ["src/**/*.html"],
     extends: [
       ...angular.configs.templateRecommended,
       ...angular.configs.templateAccessibility,
@@ -54,8 +75,6 @@ export default tseslint.config(
     rules: {
       "@angular-eslint/template/no-negated-async": "error",
       "@angular-eslint/template/use-track-by-function": "warn",
-      // Interactive divs (drag items, preview rows, brand icon) are
-      // intentional — they use role="button" + tabindex="0" in HTML.
       "@angular-eslint/template/click-events-have-key-events": "off",
       "@angular-eslint/template/interactive-supports-focus": "off",
     },

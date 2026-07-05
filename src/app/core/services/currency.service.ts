@@ -91,7 +91,6 @@ export class CurrencyService {
     }
   }
 
-  /** Convenience: convert + format in one call. */
   convertAndFormat(
     amount: number,
     from: CurrencyCode,

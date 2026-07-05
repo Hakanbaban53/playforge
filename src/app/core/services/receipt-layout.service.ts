@@ -94,7 +94,7 @@ export class ReceiptLayoutService {
     this._layout.update((list) =>
       list.map((el) => {
         if (el.id !== id) return el;
-        const nextStyles: ReceiptStyles = { ...(el.styles || {}), [key]: value };
+        const nextStyles: ReceiptStyles = { ...(el.styles ?? {}), [key]: value };
         // Normalize empty string to deletion.
         if (value === '' || value == null) {
           delete (nextStyles as Record<string, unknown>)[key as string];
@@ -127,7 +127,7 @@ export class ReceiptLayoutService {
 
   /** True if the element supports text styling. */
   isTextStylable(el: LayoutElement): boolean {
-    return el.type === 'header' || el.type === 'text';
+    return el.type === 'header' || el.type === 'text' || el.type === 'notes';
   }
 
   /** True if the element supports image styling. */
@@ -140,7 +140,25 @@ export class ReceiptLayoutService {
   private loadLayout(): LayoutElement[] {
     const stored = this.storage.read<LayoutElement[] | null>(STORAGE_KEY, null);
     if (stored && Array.isArray(stored) && stored.length > 0) {
-      return this.normalize(stored);
+      const normalized = this.normalize(stored);
+      if (!normalized.some((el) => el.type === 'notes')) {
+        const notesEl: LayoutElement = {
+          id: 'notes',
+          type: 'notes',
+          visible: true,
+          fixed: true,
+          labelKey: 'receipt.elements.notes',
+          styles: { ...DEFAULT_TEXT_STYLES },
+        };
+        const totalsIdx = normalized.findIndex((el) => el.type === 'totals');
+        if (totalsIdx >= 0) {
+          normalized.splice(totalsIdx + 1, 0, notesEl);
+        } else {
+          normalized.push(notesEl);
+        }
+        this.storage.write(STORAGE_KEY, normalized);
+      }
+      return normalized;
     }
     const fresh = buildDefaultLayout('receipt.defaultHeader', 'receipt.defaultTerms');
     // Persist the defaults so the storage key is always populated.
@@ -159,13 +177,13 @@ export class ReceiptLayoutService {
       const defaults =
         item.type === 'header'
           ? DEFAULT_HEADER_STYLES
-          : item.type === 'text'
+          : item.type === 'text' || item.type === 'notes'
             ? DEFAULT_TEXT_STYLES
             : item.type === 'image'
               ? DEFAULT_IMAGE_STYLES
               : null;
       if (defaults) {
-        next.styles = { ...defaults, ...(item.styles || {}) };
+        next.styles = { ...defaults, ...(item.styles ?? {}) };
       }
       return next;
     });

@@ -14,12 +14,34 @@
     h1 {
       font-size: 26px;
       letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     p {
       margin-top: 6px;
       max-width: 600px;
     }
+  }
+}
+
+.doc-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--brand-50);
+  color: var(--brand-700);
+  vertical-align: middle;
+
+  &--quote {
+    background: var(--warn-50);
+    color: var(--warn-500);
   }
 }
 
@@ -61,7 +83,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 1fr 480px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
   gap: 22px;
   align-items: flex-start;
 }
@@ -97,7 +119,7 @@
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px 12px;
 }
 
@@ -147,30 +169,35 @@
 .lines {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.line {
-  display: grid;
-  grid-template-columns: 64px 1fr 90px 110px 32px;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
+.line-item {
+  padding: 12px;
   background: var(--surface-50);
   border: 1px solid var(--surface-200);
   border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &__top {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
 
   &__media {
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
     border-radius: var(--radius-sm);
     overflow: hidden;
     background: var(--surface-100);
     display: grid;
     place-items: center;
+    flex-shrink: 0;
 
-    img,
-    ::ng-deep .line__media-img {
+    ::ng-deep .line-item__media-img {
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -185,7 +212,8 @@
     height: 100%;
   }
 
-  &__main {
+  &__info {
+    flex: 1 1 0;
     min-width: 0;
   }
 
@@ -236,58 +264,15 @@
     }
 
     li {
-      display: grid;
-      grid-template-columns: 30px 1fr 80px 70px;
+      display: flex;
       gap: 6px;
       font-size: 11px;
+      flex-wrap: wrap;
     }
   }
 
-  &__part-sku, &__part-price {
-    color: var(--text-subtle);
-  }
-
-  &__price {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  &__qty {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-
-    label {
-      font-size: 10px;
-      color: var(--text-subtle);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    input {
-      width: 100%;
-      border: 1px solid var(--surface-300);
-      border-radius: var(--radius-sm);
-      padding: 5px 8px;
-      font-size: 13px;
-      text-align: center;
-      -moz-appearance: textfield;
-      appearance: textfield;
-      
-      &::-webkit-outer-spin-button, &::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-      }
-    }
-  }
-
-  &__total {
-    text-align: right;
-    font-weight: 700;
-    color: var(--text-strong);
-    font-size: 14px;
-  }
+  &__part-qty { color: var(--text-muted); }
+  &__part-sku, &__part-price { color: var(--text-subtle); }
 
   &__remove {
     border: none;
@@ -298,11 +283,108 @@
     border-radius: 5px;
     display: grid;
     place-items: center;
+    flex-shrink: 0;
 
     &:hover {
       color: var(--danger-500);
       background: var(--danger-50);
     }
+  }
+
+  &__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--surface-200);
+  }
+}
+
+.ctrl {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+
+  &__label {
+    font-size: 10px;
+    color: var(--text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  &__input, &__select {
+    border: 1px solid var(--surface-300);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    font-size: 13px;
+    background: var(--surface-0);
+    color: var(--text-base);
+    font-family: inherit;
+
+    &:focus {
+      outline: none;
+      border-color: var(--brand-400);
+      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+    }
+  }
+
+  &__input {
+    -moz-appearance: textfield;
+    appearance: textfield;
+
+    &::-webkit-outer-spin-button, &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  /* Qty: narrow, centered */
+  &__input--qty {
+    width: 56px;
+    text-align: center;
+  }
+
+  /* Discount: select + value side by side */
+  &__discount {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  &__select {
+    min-width: 50px;
+    cursor: pointer;
+  }
+
+  &__input--discount {
+    width: 64px;
+    text-align: center;
+  }
+
+  /* Unit price + total: display-only, right-aligned, grow to fill */
+  &--price, &--total {
+    flex: 1 1 auto;
+    min-width: 90px;
+    align-items: flex-end;
+  }
+
+  &__value {
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+
+    &--strong {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-strong);
+    }
+  }
+
+  /* Total gets the strongest visual weight */
+  &--total {
+    flex: 1.5 1 auto;
   }
 }
 
@@ -312,33 +394,92 @@
   gap: 6px;
 }
 
-.tax-row {
-  display: grid;
-  grid-template-columns: 32px 1fr 110px 90px 100px 28px;
-  gap: 6px;
+.tax-item {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 6px;
   background: var(--surface-50);
   border: 1px solid var(--surface-200);
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  padding: 8px 10px;
 
-  input, select {
+  &__name {
+    flex: 1 1 120px;
+    min-width: 100px;
+    border: 1px solid var(--surface-300);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface-0);
+    color: var(--text-base);
+    font-family: inherit;
+
+    &:focus {
+      outline: none;
+      border-color: var(--brand-400);
+      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+    }
+  }
+
+  &__type {
+    flex: 0 0 auto;
+    min-width: 70px;
     border: 1px solid var(--surface-300);
     border-radius: 4px;
     padding: 5px 7px;
     font-size: 12px;
     background: var(--surface-0);
+    color: var(--text-base);
+    font-family: inherit;
+    cursor: pointer;
+
+    &:focus {
+      outline: none;
+      border-color: var(--brand-400);
+      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+    }
   }
 
-  .tax-name { font-weight: 600; }
-  .tax-amount {
+  &__value {
+    flex: 0 0 auto;
+    width: 60px;
+    border: 1px solid var(--surface-300);
+    border-radius: 4px;
+    padding: 5px 7px;
+    font-size: 12px;
+    text-align: center;
+    background: var(--surface-0);
+    color: var(--text-base);
+    font-family: inherit;
+    -moz-appearance: textfield;
+    appearance: textfield;
+
+    &::-webkit-outer-spin-button, &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--brand-400);
+      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+    }
+  }
+
+  &__amount {
+    flex: 0 0 auto;
+    min-width: 80px;
     text-align: right;
     font-weight: 700;
     color: var(--text-strong);
     font-size: 12px;
+    margin-left: auto;
   }
 
-  .tax-remove {
+  &__remove {
+    flex: 0 0 auto;
     border: none;
     background: transparent;
     color: var(--text-subtle);
@@ -347,6 +488,7 @@
     border-radius: 4px;
     display: grid;
     place-items: center;
+
     &:hover {
       color: var(--danger-500);
       background: var(--danger-50);
@@ -415,12 +557,14 @@
   position: sticky;
   top: 16px;
   align-self: flex-start;
+  min-width: 0;
 }
 
 .preview-sticky {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .preview-toolbar {
@@ -438,233 +582,33 @@
 }
 
 .preview-scroll {
-  max-height: calc(100vh - 160px);
+  max-height: calc(100vh - 140px);
+  min-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px;
-}
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-300) transparent;
 
-/* =================== Invoice sheet ===================
- * The invoice sheet is sized to look like a real A4/Letter page.
- * PdfService snapshots this element.
- */
-.invoice-sheet {
-  background: #ffffff;
-  margin: 0 auto;
-  padding: 32px;
-  font-size: 12px;
-  color: #1f242b;
-  box-shadow: var(--shadow-md);
-  border-radius: 4px;
-
-  &.sheet--a4 { width: 210mm; min-height: 297mm; }
-  &.sheet--a5 { width: 148mm; min-height: 210mm; padding: 22px; font-size: 11px; }
-  &.sheet--letter { width: 216mm; min-height: 279mm; }
-}
-
-.inv-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  border-bottom: 2px solid var(--brand-500);
-  padding-bottom: 16px;
-  margin-bottom: 16px;
-
-  &__seller pre {
-    font-family: var(--font-sans);
-    font-size: 12px;
-    margin: 0;
-    white-space: pre-wrap;
-    color: #353d46;
-    line-height: 1.45;
-  }
-
-  &__meta {
-    text-align: right;
-  }
-
-  &__meta h2 {
-    font-size: 24px;
-    color: var(--brand-700);
-    letter-spacing: 0.08em;
-    margin: 0;
-  }
-
-  &__num {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  &__date {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-
-    strong { color: var(--text-base); }
-  }
-}
-
-.inv-billto {
-  margin-bottom: 18px;
-
-  &__label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    margin-bottom: 4px;
-  }
-
-  &__name {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-strong);
-  }
-
-  &__line {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
-
-  &__addr {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    margin: 4px 0 0;
-    white-space: pre-wrap;
-    color: var(--text-muted);
-  }
-}
-
-.inv-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 16px;
-
-  thead th {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    text-align: left;
-    padding: 8px 10px;
-    background: var(--surface-50);
-    border-bottom: 2px solid var(--surface-200);
-  }
-
-  &__qty { text-align: center; width: 36px; }
-  &__num { text-align: right; width: 90px; }
-
-  tbody td {
-    padding: 10px;
-    border-bottom: 1px solid var(--surface-200);
-    vertical-align: top;
-  }
-}
-
-.inv-row {
-  &__cell {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-  }
-
-  &__img {
-    width: 56px;
-    height: 56px;
-    object-fit: cover;
+  &::-webkit-scrollbar { width: 8px; }
+  &::-webkit-scrollbar-thumb {
+    background: var(--surface-300);
     border-radius: 4px;
-    flex-shrink: 0;
-    background: var(--surface-100);
   }
-
-  &__name {
-    font-weight: 600;
-    color: var(--text-strong);
-    font-size: 12px;
-  }
-
-  &__code {
-    font-size: 10px;
-    color: var(--text-subtle);
-    margin-top: 1px;
-  }
-
-  &__size {
-    font-size: 10px;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
-
-  &__parts {
-    font-size: 10px;
-    color: var(--text-muted);
-    margin-top: 4px;
-    line-height: 1.4;
-    max-width: 320px;
-  }
+  &::-webkit-scrollbar-track { background: transparent; }
 }
 
-.inv-empty {
-  text-align: center;
-  color: var(--text-subtle);
-  padding: 24px !important;
-}
-
-.inv-totals {
-  margin-left: auto;
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 18px;
-
-  &__row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: var(--text-muted);
-
-    &--tax {
-      color: var(--text-base);
-    }
-
-    &--grand {
-      border-top: 2px solid var(--surface-300);
-      margin-top: 6px;
-      padding-top: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text-strong);
-    }
-  }
-}
-
-.inv-notes {
-  border-top: 1px dashed var(--surface-300);
-  padding-top: 12px;
-
-  pre {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    color: var(--text-muted);
-    margin: 0;
-    white-space: pre-wrap;
-    line-height: 1.5;
-  }
-}
-
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .preview-pane {
     position: static;
   }
-  .invoice-sheet {
-    width: 100% !important;
-    min-height: auto !important;
+  /* On tablet, the preview still gets its own scroll area so the page
+   * doesn't grow unboundedly. */
+  .preview-scroll {
+    max-height: 70vh;
   }
 }
 
@@ -703,78 +647,41 @@
     padding: 14px 12px;
   }
 
-  .line {
-    grid-template-columns: 56px 1fr;
-    gap: 10px;
-
-    &__qty {
-      grid-column: 1 / -1;
-      flex-direction: row;
-      align-items: center;
-      gap: 10px;
-
-      label {
-        font-size: 12px;
-      }
-
-      input {
-        width: 80px;
-      }
+  .line-item {
+    &__controls {
+      gap: 8px;
     }
 
-    &__total {
-      grid-column: 1 / -1;
-      text-align: right;
-      font-size: 16px;
-    }
+    .ctrl {
+      flex: 1 1 100%;
 
-    &__remove {
-      position: absolute;
-      top: 8px;
-      right: 8px;
+      &--price, &--total {
+        flex: 1 1 100%;
+        align-items: flex-start;
+      }
+
+      &__value {
+        font-size: 14px;
+      }
     }
   }
 
-  .tax-row {
-    grid-template-columns: 32px 1fr 80px;
-    gap: 6px;
-
-    .tax-name {
-      grid-column: 1 / -1;
-    }
-    select {
-      grid-column: 1 / 3;
-    }
-    .tax-amount {
-      grid-column: 3;
-    }
-    .tax-remove {
-      display: none;
+  .tax-item {
+    &__amount {
+      flex: 1 1 100%;
+      text-align: left;
+      font-size: 13px;
+      padding-top: 4px;
+      border-top: 1px solid var(--surface-200);
+      margin-left: 0;
     }
   }
 
   .preview-scroll {
-    max-height: none;
+    /* On mobile, the preview still needs its own scroll area so the
+     * page doesn't grow unboundedly. */
+    max-height: 60vh;
+    min-height: 240px;
   }
 
-  .invoice-sheet {
-    padding: 20px 16px;
-    font-size: 11px;
-  }
-
-  .inv-table {
-    th, td {
-      padding: 6px 4px;
-      font-size: 10px;
-    }
-  }
-
-  .inv-row__img {
-    width: 36px !important;
-    height: 36px !important;
-  }
-
-  .inv-totals {
-    width: 100%;
-  }
 }

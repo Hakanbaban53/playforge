@@ -23,11 +23,11 @@ describe('ReceiptLayoutService', () => {
     service = TestBed.inject(ReceiptLayoutService);
   });
 
-  it('starts with the default layout (6 fixed elements)', () => {
+  it('starts with the default layout (7 fixed elements)', () => {
     const layout = service.layout();
-    expect(layout.length).toBe(6);
+    expect(layout.length).toBe(7);
     expect(layout.map((el) => el.id)).toEqual([
-      'header', 'meta', 'table', 'totals', 'terms', 'visuals',
+      'header', 'meta', 'table', 'totals', 'notes', 'terms', 'visuals',
     ]);
     // Fixed elements cannot be removed.
     expect(layout.every((el) => el.fixed)).toBe(true);
@@ -40,7 +40,7 @@ describe('ReceiptLayoutService', () => {
   it('addElement(text) appends a new text element with default styles', () => {
     const id = service.addElement('text');
     const layout = service.layout();
-    expect(layout.length).toBe(7);
+    expect(layout.length).toBe(8);
     const added = layout.find((el) => el.id === id);
     expect(added).toBeDefined();
     expect(added!.type).toBe('text');
@@ -65,16 +65,16 @@ describe('ReceiptLayoutService', () => {
 
   it('removeElement() removes user-added elements but not fixed ones', () => {
     const id = service.addElement('text');
-    expect(service.layout().length).toBe(7);
+    expect(service.layout().length).toBe(8);
 
     const removed = service.removeElement(id);
     expect(removed).toBe(true);
-    expect(service.layout().length).toBe(6);
+    expect(service.layout().length).toBe(7);
 
     // Try to remove a fixed element — should fail.
     const fixedRemoved = service.removeElement('header');
     expect(fixedRemoved).toBe(false);
-    expect(service.layout().length).toBe(6);
+    expect(service.layout().length).toBe(7);
   });
 
   it('toggleVisibility() flips the visible flag', () => {
@@ -110,12 +110,12 @@ describe('ReceiptLayoutService', () => {
     expect(service.layout()[1].id).toBe('header');
   });
 
-  it('resetToDefault() restores the 6 default elements', () => {
+  it('resetToDefault() restores the 7 default elements', () => {
     service.addElement('text');
     service.addElement('image');
-    expect(service.layout().length).toBe(8);
+    expect(service.layout().length).toBe(9);
     service.resetToDefault();
-    expect(service.layout().length).toBe(6);
+    expect(service.layout().length).toBe(7);
   });
 
   it('isRemovable() returns false for fixed elements', () => {

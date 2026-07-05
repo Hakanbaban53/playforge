@@ -34,6 +34,8 @@ export interface InvoiceLine {
   unitPrice: number;
   /** Number of assemblies on this line. */
   quantity: number;
+  /** Optional per-line discount. When absent, no discount is applied. */
+  discount?: LineDiscount;
   /** Primary image URL for the line (rendered on the PDF). */
   imageUrl?: string;
   /** Optional size label (e.g. "5m"). */
@@ -53,14 +55,34 @@ export interface TaxLine {
 
 export type PaperSize = 'A4' | 'A5' | 'Letter';
 
+/** Document type — a quote is a proposal, an invoice is a bill. Both share
+ *  the same shape; the distinction affects the document number prefix
+ *  (`QUO-` vs `INV-`) and the heading shown on the PDF. */
+export type DocType = 'quote' | 'invoice';
+
+/** Per-line discount. `percent` subtracts N% of the line total; `fixed`
+ *  subtracts a flat amount in the invoice currency. */
+export type DiscountType = 'percent' | 'fixed';
+
+export interface LineDiscount {
+  type: DiscountType;
+  /** For `percent`: 0-100. For `fixed`: a non-negative amount. */
+  value: number;
+}
+
 export interface InvoiceMeta {
   invoiceNumber: string;
+  /** Quote vs invoice — same shape, different prefix + heading. */
+  docType: DocType;
   issueDate: string; // ISO yyyy-mm-dd
   dueDate?: string;
   customerName: string;
   customerEmail?: string;
   customerAddress?: string;
   customerTaxId?: string;
+  /** Optional customer id from the customer book, if this invoice was
+   *  created against a saved customer. */
+  customerId?: string;
   /** Seller info block (multi-line). */
   seller: string;
   currency: string;
@@ -78,9 +100,22 @@ export interface Invoice {
   updatedAt: number;
 }
 
-/** Helper: total for a single line. */
+/** Helper: total for a single line, applying any per-line discount. */
 export function lineTotal(line: InvoiceLine): number {
-  return line.unitPrice * line.quantity;
+  const gross = line.unitPrice * line.quantity;
+  return applyDiscount(gross, line.discount);
+}
+
+/** Apply a discount (percent or fixed) to a gross amount. Returns the
+ *  discounted amount, never negative. */
+export function applyDiscount(amount: number, discount?: LineDiscount): number {
+  if (!discount || discount.value === 0) return amount;
+  if (discount.type === 'percent') {
+    const pct = Math.max(0, Math.min(100, discount.value));
+    return Math.max(0, amount - amount * (pct / 100));
+  }
+  // Fixed-amount discount — never goes below zero.
+  return Math.max(0, amount - Math.max(0, discount.value));
 }
 
 /** Helper: build an InvoiceLine from a resolved catalog variant. */

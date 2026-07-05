@@ -1,0 +1,166 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <h1>{{ 'customers.title' | translate }}</h1>
+      <p class="muted">{{ 'customers.subtitle' | translate }}</p>
+    </div>
+    <div class="head-actions">
+      <app-button variant="primary" size="md" (click)="startCreate()" [disabled]="isCreating()">
+        <app-icon name="add" [size]="14" />
+        {{ 'customers.add' | translate }}
+      </app-button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ===================== Customers (left) ===================== -->
+    <section class="column">
+      @if (isCreating()) {
+        <div class="surface-card form-card">
+          <h3 class="card__title">
+            {{ editingId() ? ('common.edit' | translate) : ('customers.add' | translate) }}
+          </h3>
+          <div class="form-grid">
+            <label class="field field--full">
+              <span>{{ 'customers.name' | translate }} *</span>
+              <input
+                type="text"
+                [value]="fName()"
+                (input)="onInput('name', $event)"
+                [placeholder]="'customers.namePlaceholder' | translate"
+              />
+            </label>
+            <label class="field">
+              <span>{{ 'customers.taxId' | translate }}</span>
+              <input type="text" [value]="fTaxId()" (input)="onInput('taxId', $event)" />
+            </label>
+            <label class="field">
+              <span>{{ 'customers.email' | translate }}</span>
+              <input type="email" [value]="fEmail()" (input)="onInput('email', $event)" />
+            </label>
+            <label class="field">
+              <span>{{ 'customers.phone' | translate }}</span>
+              <input type="tel" [value]="fPhone()" (input)="onInput('phone', $event)" />
+            </label>
+            <label class="field field--full">
+              <span>{{ 'customers.address' | translate }}</span>
+              <textarea rows="2" [value]="fAddress()" (input)="onInput('address', $event)"></textarea>
+            </label>
+            <label class="field field--full">
+              <span>{{ 'customers.notes' | translate }}</span>
+              <textarea rows="2" [value]="fNotes()" (input)="onInput('notes', $event)"></textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <app-button variant="ghost" size="sm" (click)="cancelEdit()">
+              {{ 'common.cancel' | translate }}
+            </app-button>
+            <app-button variant="primary" size="sm" (click)="save()">
+              <app-icon name="save" [size]="14" />
+              {{ 'common.save' | translate }}
+            </app-button>
+          </div>
+        </div>
+      }
+
+      @if (isEmpty() && !isCreating()) {
+        <div class="surface-card empty">
+          <app-icon name="group" [size]="36" />
+          <p>{{ 'customers.noCustomers' | translate }}</p>
+        </div>
+      } @else {
+        <div class="customers-list">
+          @for (c of customers(); track c.id) {
+            <article class="surface-card customer-card">
+              <div class="customer-card__head">
+                <div class="customer-card__avatar">
+                  <app-icon name="person" [size]="18" />
+                </div>
+                <div class="customer-card__main">
+                  <h4>{{ c.name }}</h4>
+                  <div class="customer-card__meta">
+                    @if (c.taxId)   { <span class="mono">{{ c.taxId }}</span> }
+                    @if (c.email)   { <span>· {{ c.email }}</span> }
+                    @if (c.phone)   { <span>· {{ c.phone }}</span> }
+                  </div>
+                </div>
+              </div>
+
+              @if (c.address || c.notes) {
+                <div class="customer-card__body">
+                  @if (c.address) { <p class="muted small">{{ c.address }}</p> }
+                  @if (c.notes)   { <p class="muted small italic">{{ c.notes }}</p> }
+                </div>
+              }
+
+              <div class="customer-card__actions">
+                <app-button variant="primary" size="sm" (click)="useForInvoice(c)">
+                  <app-icon name="description" [size]="14" />
+                  {{ 'customers.useForInvoice' | translate }}
+                </app-button>
+                <app-button variant="secondary" size="sm" (click)="startEdit(c)">
+                  <app-icon name="edit" [size]="14" />
+                  {{ 'common.edit' | translate }}
+                </app-button>
+                <app-button variant="ghost" size="sm" (click)="remove(c)">
+                  <app-icon name="delete" [size]="14" />
+                </app-button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- ===================== Saved invoices (right) ===================== -->
+    <section class="column">
+      <h3 class="column__title">{{ 'customers.invoiceHistory' | translate }}</h3>
+
+      @if (savedInvoices().length === 0) {
+        <div class="surface-card empty">
+          <app-icon name="receipt_long" [size]="36" />
+          <p>{{ 'customers.noInvoices' | translate }}</p>
+        </div>
+      } @else {
+        <div class="invoices-list">
+          @for (inv of savedInvoices(); track inv.id) {
+            <article class="surface-card invoice-card" [class.invoice-card--quote]="inv.meta.docType === 'quote'">
+              <div class="invoice-card__head">
+                <span class="invoice-card__type" [class.invoice-card__type--quote]="inv.meta.docType === 'quote'">
+                  {{ (inv.meta.docType === 'quote' ? 'quote.quote' : 'quote.invoice') | translate }}
+                </span>
+                <span class="invoice-card__num mono">{{ inv.meta.invoiceNumber }}</span>
+              </div>
+              <div class="invoice-card__body">
+                <div class="invoice-card__customer">
+                  <app-icon name="person" [size]="14" />
+                  <span>{{ savedInvoiceCustomer(inv) }}</span>
+                </div>
+                <div class="invoice-card__meta">
+                  <span class="muted small">{{ formatDate(inv.updatedAt) }}</span>
+                  <span>·</span>
+                  <span>{{ inv.lines.length }} {{ 'common.quantity' | translate }}</span>
+                </div>
+              </div>
+              <div class="invoice-card__footer">
+                <div class="invoice-card__total">
+                  <span class="muted small">{{ 'customers.total' | translate }}</span>
+                  <strong>{{ savedInvoiceTotal(inv) | money: inv.meta.currency }}</strong>
+                </div>
+                <div class="invoice-card__actions">
+                  <app-button variant="primary" size="sm" (click)="cloneToEditor(inv)">
+                    <app-icon name="content_copy" [size]="14" />
+                    {{ 'customers.clone' | translate }}
+                  </app-button>
+                  <app-button variant="ghost" size="sm" (click)="deleteInvoice(inv)">
+                    <app-icon name="delete" [size]="14" />
+                  </app-button>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</section>

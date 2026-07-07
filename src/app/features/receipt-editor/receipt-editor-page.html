@@ -310,13 +310,11 @@
         <span class="muted small">{{ active().meta.paperSize }}</span>
       </div>
 
-      <div class="preview-scroll">
-        <app-receipt-preview
-          [invoice]="active()"
-          [layout]="layout()"
-          [paperSize]="active().meta.paperSize"
-        />
-      </div>
+      <app-receipt-preview
+        [invoice]="active()"
+        [layout]="layout()"
+        [paperSize]="active().meta.paperSize"
+      />
     </aside>
   </div>
 </section>

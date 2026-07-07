@@ -84,6 +84,12 @@
   --motion-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
 
   --app-max-width: 1480px;
+  --app-max-width-narrow: 1100px;
+
+  /* Focus ring color — brand-tinted, used by every form control.
+     Variants exist so dense UIs (compact controls, search bars) can opt
+     into a thicker ring without re-typing the color. */
+  --brand-focus-ring: rgba(31, 157, 86, 0.12);
 
   /* ---- Layout breakpoints ----
    * Centralized so pages stop hard-coding their own magic numbers.
@@ -103,7 +109,7 @@
   --bp-desktop: 1280px;
   --bp-wide: 1480px;
 
-  /* Sidebar widths (kept in sync with app.scss) */
+  /* Sidebar widths — consumed by app.scss via var(--sidebar-width) */
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 72px;
 
@@ -180,14 +186,13 @@
     var(--surface-50);
   --sidebar-bg: linear-gradient(180deg, #0a0d10 0%, #11151a 100%);
   --invoice-sheet-bg: #ffffff; /* Invoice PDF always renders on white */
+
+  --brand-focus-ring: rgba(56, 181, 103, 0.22);
 }
 
 [data-theme='dark'] body {
   background: var(--app-bg);
   color: var(--text-base);
-  /* Tell the browser to render native controls (date pickers, selects,
-     scrollbars, etc.) in dark mode. This is the single most important
-     dark-mode fix for form controls. */
   color-scheme: dark;
 }
 
@@ -241,16 +246,8 @@
 
 /* Color input swatch border */
 [data-theme='dark'] input[type='color'] {
-  border: 1px solid var(--surface-400);
+  box-shadow: 0 0 0 1px var(--surface-400);
   padding: 2px;
-}
-
-/* Scrollbar in dark mode */
-[data-theme='dark'] ::-webkit-scrollbar-thumb {
-  background: var(--surface-500);
-}
-[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
-  background: var(--surface-400);
 }
 
 * { box-sizing: border-box; }
@@ -285,7 +282,7 @@ button { font-family: inherit; }
 /* ---- Utility primitives (used app-wide) ---- */
 .surface-card {
   background: var(--surface-0);
-  border: 1px solid var(--surface-200);
+  box-shadow: 0 0 0 1px var(--surface-200);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
@@ -293,17 +290,6 @@ button { font-family: inherit; }
 .muted { color: var(--text-muted); }
 .subtle { color: var(--text-subtle); }
 .mono { font-family: var(--font-mono); }
-
-/* ---- Scrollbar (subtle, modern) ---- */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb {
-  background: var(--surface-300);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-::-webkit-scrollbar-thumb:hover { background: var(--surface-400); background-clip: padding-box; }
-::-webkit-scrollbar-track { background: transparent; }
 
 /* ---- Enter animations (CSS only, no Angular Animations) ---- */
 @keyframes fade-in {
@@ -325,6 +311,9 @@ button { font-family: inherit; }
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.55; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .anim-fade-in   { animation: fade-in var(--motion-base) both; }
@@ -349,4 +338,93 @@ button { font-family: inherit; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* =============================================================================
+ * Shared UI primitives — single source of truth for patterns that were
+ * previously copy-pasted across multiple feature-page SCSS files.
+ * Pages can override spacing (margin/padding) locally when needed; the
+ * structural + color rules live here.
+ * ========================================================================== */
+
+/* ---- Text helpers ---- */
+.small { font-size: 12px; }
+
+/* Inline separator dot used between meta items. */
+.dot { opacity: 0.5; }
+
+/* ---- Alerts (inline notification banners) ---- */
+.alert {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 14px;
+
+  &--error   { background: var(--danger-50);  color: var(--danger-700);  box-shadow: 0 0 0 1px var(--danger-500); }
+  &--success { background: var(--success-50); color: var(--success-500); box-shadow: 0 0 0 1px var(--success-500); }
+  &--warn    { background: var(--warn-50);    color: var(--warn-500);    box-shadow: 0 0 0 1px var(--warn-500); }
+  &--info    { background: var(--info-50);    color: var(--info-500);    box-shadow: 0 0 0 1px var(--info-500); }
+}
+
+/* ---- Square-ish icon-only button (hover-lift, optional danger variant) ---- */
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background var(--motion-fast), color var(--motion-fast);
+
+  &:hover {
+    background: var(--surface-200);
+    color: var(--text-strong);
+  }
+
+  &--danger:hover {
+    background: var(--danger-50);
+    color: var(--danger-500);
+  }
+}
+
+/* ---- Empty-state containers ---- */
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.empty-mini {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  p { font-size: 12px; }
+}
+
+/* ---- Inline link-styled button (no chrome, brand-colored) ---- */
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--brand-700);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+
+  &:hover { text-decoration: underline; }
 }

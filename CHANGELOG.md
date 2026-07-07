@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - Unreleased
+## [0.1.2] - 2026-07-07
+
+### Added
+
+- **Auto-Update System**:
+  - Implemented a background thread in Tauri that periodically checks for updates every 6 hours and emits an event to the frontend.
+  - Added a global `<app-update-banner>` component and corresponding service logic to notify the user and manage update application/progress.
+  - Integrated `tauri-plugin-window-state` to save and restore window dimensions and state across restarts.
+
+### Changed
+
+- **CSS & Component Style Refactoring**:
+  - Moved shared UI components (alerts, empty states, icon/link buttons) into centralized style definitions inside `styles.scss` to eliminate style duplication.
+  - Updated border rules to use box shadows (`0 0 0 1px`) for consistent rendering.
+  - Confined `<app-receipt-preview>` to a scrollable container with a fixed layout size to prevent sidebar layout shifts and overflow.
+  - Switched Tauri's window builder to use a default starting dimension of 800x630.
+
+## [0.1.1] - 2026-07-05
 
 ### Added
 

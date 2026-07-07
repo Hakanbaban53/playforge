@@ -121,11 +121,6 @@ type ButtonSize = 'sm' | 'md' | 'lg';
         border-top-color: transparent;
         animation: spin 0.7s linear infinite;
       }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
     `,
   ],
 })

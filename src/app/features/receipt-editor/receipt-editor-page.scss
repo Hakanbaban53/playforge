@@ -1,6 +1,6 @@
 .page {
   padding: 24px 28px 48px;
-  max-width: 1480px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
 
   &__head {
@@ -74,7 +74,7 @@
   flex-direction: column;
   gap: 4px;
   background: var(--surface-0);
-  border: 1px solid var(--surface-200);
+  box-shadow: 0 0 0 1px var(--surface-200);
   border-radius: var(--radius-md);
   padding: 6px;
   min-height: 200px;
@@ -88,7 +88,7 @@
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   background: var(--surface-50);
-  border: 1px solid transparent;
+  box-shadow: 0 0 0 1px transparent;
   cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast);
 
@@ -140,29 +140,6 @@
     padding: 1px 5px;
     border-radius: 3px;
     font-weight: 700;
-  }
-}
-
-.icon-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background var(--motion-fast), color var(--motion-fast);
-
-  &:hover {
-    background: var(--surface-200);
-    color: var(--text-strong);
-  }
-
-  &--danger:hover {
-    background: var(--danger-50);
-    color: var(--danger-500);
   }
 }
 
@@ -229,7 +206,7 @@
   }
 
   textarea, input[type='text'], input[type='number'], select {
-    border: 1px solid var(--surface-300);
+    box-shadow: 0 0 0 1px var(--surface-300);
     border-radius: var(--radius-sm);
     padding: 6px 9px;
     font-size: 12px;
@@ -240,14 +217,14 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 3px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 
   input[type='color'] {
     width: 50px;
     height: 28px;
-    border: 1px solid var(--surface-300);
+    box-shadow: 0 0 0 1px var(--surface-300);
     border-radius: var(--radius-sm);
     padding: 2px;
     background: var(--surface-0);
@@ -282,7 +259,7 @@
     height: 100%;
     object-fit: cover;
     border-radius: 4px;
-    border: 1px solid var(--surface-200);
+    box-shadow: 0 0 0 1px var(--surface-200);
   }
 
   &__remove {
@@ -310,26 +287,14 @@
 }
 
 .alert {
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
   margin-bottom: 10px;
-
-  &--error {
-    background: var(--danger-50);
-    color: var(--danger-700);
-    border: 1px solid var(--danger-500);
-  }
 }
 
 .stepper {
   display: flex;
   align-items: stretch;
   gap: 0;
-  border: 1px solid var(--surface-300);
+  box-shadow: 0 0 0 1px var(--surface-300);
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--surface-0);
@@ -389,41 +354,12 @@
 .preview-pane {
   position: sticky;
   top: 14px;
-  /* Don't let the preview pane grow taller than the viewport — its
-   * inner scroll container handles overflow. `align-self: flex-start`
-   * would be redundant since the parent grid uses `align-items: flex-start`. */
   min-width: 0;
-}
-
-.preview-scroll {
-  /* Leave room for the pane header (≈30px) + page padding (≈48px top) +
-   * a bit of breathing room. `min-height: 0` is required for flex/grid
-   * children to actually constrain their height. */
-  max-height: calc(100vh - 140px);
-  min-height: 320px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px;
-  /* Inert scrollbar styling so it doesn't compete with the preview content. */
-  scrollbar-width: thin;
-  scrollbar-color: var(--surface-300) transparent;
-
-  &::-webkit-scrollbar { width: 8px; }
-  &::-webkit-scrollbar-thumb {
-    background: var(--surface-300);
-    border-radius: 4px;
-  }
-  &::-webkit-scrollbar-track { background: transparent; }
 }
 
 @media (max-width: 1024px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .preview-pane { position: static; }
-  /* On tablet, give the preview a fixed max-height so it doesn't push
-   * the page footer off-screen — the user can scroll inside the pane. */
-  .preview-scroll {
-    max-height: 70vh;
-  }
 }
 
 @media (max-width: 768px) {
@@ -509,11 +445,6 @@
     }
   }
 
-  .preview-scroll {
-    /* On mobile, the preview pane still needs to scroll internally —
-     * otherwise the long preview pushes the page footer off-screen. */
-    max-height: 60vh;
-    min-height: 240px;
-  }
+
 
 }

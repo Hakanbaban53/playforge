@@ -82,7 +82,7 @@
 
         @if (updateService.updateAvailable(); as update) {
           <div class="update-available">
-            <div class="update-available__info">
+            <div>
               <div class="update-available__version">v{{ update.version }}</div>
               <div class="muted small">{{ 'settings.updateAvailableDesc' | translate: { version: update.version } }}</div>
             </div>

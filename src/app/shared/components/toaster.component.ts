@@ -75,16 +75,11 @@ import { IconComponent } from './icon.component';
       padding-bottom: 14px;
       border-radius: var(--radius-md);
       background: var(--surface-0);
-      border: 1px solid var(--surface-200);
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 0 0 1px var(--surface-200);
       font-size: 13px;
       color: var(--text-base);
-      /* Entry animation — slide in from the right + fade. */
       animation: toast-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
-      /* Exit animation — only plays when .toast--leaving is added by
-         ToastService.dismiss(). The service waits EXIT_ANIM_MS (280ms)
-         before removing the element from the DOM. */
       &--leaving {
         animation: toast-exit 280ms cubic-bezier(0.4, 0, 0.6, 1) both;
       }

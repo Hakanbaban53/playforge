@@ -1,6 +1,6 @@
 .page {
-  padding: 28px 32px 48px;
-  max-width: 1480px;
+  padding: var(--page-padding-y) var(--page-padding-x) 48px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
 
   &__head {
@@ -91,7 +91,7 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 3px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 

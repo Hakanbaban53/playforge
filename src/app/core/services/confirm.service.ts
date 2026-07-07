@@ -27,8 +27,8 @@ export class ConfirmService {
           <h2 id="confirm-title" style="margin: 0 0 12px; font-size: 18px; line-height: 1.2;">${this.escapeHtml(title)}</h2>
           <p id="confirm-message" style="margin: 0; white-space: pre-wrap; color: var(--text-muted, #4b5563); line-height: 1.5;">${this.escapeHtml(message)}</p>
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-            <button value="cancel" style="padding: 8px 14px; border-radius: 10px; border: 1px solid var(--surface-300, #d1d5db); background: var(--surface-0, #fff); color: var(--text-base, #111827); cursor: pointer;">Cancel</button>
-            <button value="confirm" style="padding: 8px 14px; border-radius: 10px; border: 1px solid var(--brand-700, #0f6638); background: var(--brand-600, #138044); color: #fff; cursor: pointer;">Confirm</button>
+            <button value="cancel" style="padding: 8px 14px; border-radius: 10px; box-shadow: 0 0 0 1px var(--surface-300, #d1d5db); background: var(--surface-0, #fff); color: var(--text-base, #111827); cursor: pointer;">Cancel</button>
+            <button value="confirm" style="padding: 8px 14px; border-radius: 10px; box-shadow: 0 0 0 1px var(--brand-700, #0f6638); background: var(--brand-600, #138044); color: #fff; cursor: pointer;">Confirm</button>
           </div>
         </form>
       `;

@@ -170,7 +170,6 @@
           <div class="lines">
             @for (line of active().lines; track line.id) {
               <article class="line-item">
-                <!-- Row 1: media + product info + remove -->
                 <div class="line-item__top">
                   <div class="line-item__media">
                     @if (line.imageUrl) {
@@ -218,7 +217,6 @@
                   </button>
                 </div>
 
-                <!-- Row 2: controls (qty, discount, unit price, total) — wraps -->
                 <div class="line-item__controls">
                   <div class="ctrl">
                     <span class="ctrl__label">{{ 'common.quantity' | translate }}</span>
@@ -363,13 +361,11 @@
           receipt editor uses). Any layout changes made in the receipt editor
           are immediately reflected here.
         -->
-        <div class="preview-scroll">
-          <app-receipt-preview
-            [invoice]="active()"
-            [layout]="layout()"
-            [paperSize]="active().meta.paperSize"
-          />
-        </div>
+        <app-receipt-preview
+          [invoice]="active()"
+          [layout]="layout()"
+          [paperSize]="active().meta.paperSize"
+        />
       </div>
     </aside>
   </div>

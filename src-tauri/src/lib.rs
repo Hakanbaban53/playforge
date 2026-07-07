@@ -154,15 +154,65 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
-            let _window =
-                tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
-                    .title("PlayForge")
-                    .inner_size(1280.0, 800.0)
-                    .min_inner_size(360.0, 500.0)
-                    .resizable(true)
-                    .center()
-                    .build()?;
+            let b = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                .title("PlayForge")
+                .inner_size(800.0, 630.0)
+                .resizable(true)
+                .center()
+                .shadow(false)
+                .devtools(true)
+                .min_inner_size(362.0, 240.0);
+
+            #[cfg(target_os = "windows")]
+            {
+                use tauri::webview::ScrollBarStyle;
+                b = b.scroll_bar_style(ScrollBarStyle::FluentOverlay);
+            }
+
+            let _window = b.build()?;
+
+            // Periodic update check every 6 hours (sleeps 6 hours initially)
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    // Sleep 6 hours first, since the frontend checks on startup
+                    std::thread::sleep(std::time::Duration::from_secs(6 * 60 * 60));
+
+                    log::info!("Checking for updates (periodic background thread)...");
+                    let app_handle = app_handle.clone();
+                    tauri::async_runtime::block_on(async move {
+                        let updater = match app_handle.updater_builder().build() {
+                            Ok(u) => u,
+                            Err(e) => {
+                                log::warn!("Periodic updater build failed: {e}");
+                                return;
+                            }
+                        };
+
+                        match updater.check().await {
+                            Ok(Some(update)) => {
+                                log::info!("Update available (periodic): v{}", update.version);
+                                let info = UpdateInfo {
+                                    version: update.version.clone(),
+                                    current_version: update.current_version.clone(),
+                                    release_notes: None,
+                                    release_url: None,
+                                    download_size: None,
+                                };
+                                let _ = app_handle.emit("update-available", &info);
+                            }
+                            Ok(None) => {
+                                log::info!("App is up to date (periodic check)");
+                            }
+                            Err(e) => {
+                                log::warn!("Periodic update check failed: {e}");
+                            }
+                        }
+                    });
+                }
+            });
 
             Ok(())
         })

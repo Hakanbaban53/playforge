@@ -169,6 +169,19 @@ import {
   styles: [`
     :host {
       display: block;
+      max-height: calc(100vh - 140px);
+      min-height: 320px;
+      overflow: auto;
+      padding: 4px;
+
+      @media (max-width: 1100px) {
+        max-height: 70vh;
+      }
+
+      @media (max-width: 768px) {
+        max-height: 60vh;
+        min-height: 240px;
+      }
     }
 
     .invoice-sheet {
@@ -179,8 +192,8 @@ import {
       color: #1f242b;
       box-shadow: var(--shadow-md);
       border-radius: 4px;
-      width: 100%;
-      max-width: 540pt;
+      width: 540pt;
+      min-width: 540pt;
     }
 
     .r-block {
@@ -269,15 +282,6 @@ import {
       font-size: 13px;
       font-weight: 700;
       color: #111827;
-    }
-
-    @media (max-width: 768px) {
-      .invoice-sheet {
-        padding: 20px 16px;
-        font-size: 11px;
-      }
-      .r-totals { width: 100%; }
-      .r-table th, .r-table td { padding: 6px 4px; font-size: 10px; }
     }
   `],
 })

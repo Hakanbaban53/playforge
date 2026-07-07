@@ -44,6 +44,25 @@ export class UpdateService {
   readonly error = signal<string | null>(null);
   readonly checking = signal(false);
 
+  constructor() {
+    void this.setupListener();
+    void this.checkForUpdates();
+  }
+
+  private async setupListener(): Promise<void> {
+    if (!UpdateService.isTauri()) return;
+
+    try {
+      const { listen } = await import('@tauri-apps/api/event');
+      await listen<UpdateInfo>('update-available', (event) => {
+        console.info('[Update] Update event received from backend:', event.payload);
+        this.updateAvailable.set(event.payload);
+      });
+    } catch (err) {
+      console.warn('[Update] Failed to setup listener:', err);
+    }
+  }
+
   /** True if running inside Tauri (updates only work in Tauri mode). */
   static isTauri(): boolean {
     return typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';

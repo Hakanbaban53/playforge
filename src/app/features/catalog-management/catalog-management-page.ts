@@ -143,7 +143,6 @@ export class CatalogManagementPage {
     if (!name) { this.error.set(this.i18n.t('catalogMgmt.nameRequired')); return; }
     if (!code) { this.error.set(this.i18n.t('catalogMgmt.codeRequired')); return; }
 
-    // Check duplicate code
     const existing = this.families().find(
       (f) => f.code.toLowerCase() === code.toLowerCase() && f.id !== this.editingId(),
     );

@@ -29,21 +29,19 @@
         class="sidebar__brand"
         role="button"
         tabindex="0"
-        (click)="!isMobile() && toggleSidebar()"
-        (keydown.enter)="!isMobile() && toggleSidebar()"
-        (keydown.space)="!isMobile() && toggleSidebar()"
+        (click)=" toggleSidebar()"
+        (keydown.enter)="toggleSidebar()"
+        (keydown.space)="toggleSidebar()"
         [attr.aria-label]="'nav.toggleSidebar' | translate"
         [attr.aria-expanded]="!sidebarCollapsed()"
       >
         <div class="brand-mark">
           <app-icon class="brand-mark__default" name="inventory_2" [size]="22" />
-          @if (!isMobile()) {
             <app-icon
               class="brand-mark__hover"
               [name]="sidebarCollapsed() ? 'chevron_right' : 'chevron_left'"
               [size]="20"
             />
-          }
         </div>
         @if (showText()) {
           <div class="brand-text">
@@ -52,11 +50,6 @@
           </div>
         }
       </div>
-      @if (isMobile()) {
-        <button type="button" class="sidebar__close-btn" (click)="closeMobileDrawer()" [attr.aria-label]="'nav.closeMenu' | translate">
-          <app-icon name="close" [size]="20" />
-        </button>
-      }
     </div>
 
     <nav class="sidebar__nav">
@@ -98,6 +91,8 @@
     <router-outlet />
   </main>
 </div>
+
+<app-update-banner />
 
 <app-toaster />
 

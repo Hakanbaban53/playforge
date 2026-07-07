@@ -30,6 +30,7 @@
   "common": {
     "save": "Kaydet",
     "cancel": "İptal",
+    "dismiss": "Yoksay",
     "delete": "Sil",
     "edit": "Düzenle",
     "add": "Ekle",

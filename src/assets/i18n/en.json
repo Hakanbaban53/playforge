@@ -30,6 +30,7 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "dismiss": "Dismiss",
     "delete": "Delete",
     "edit": "Edit",
     "add": "Add",

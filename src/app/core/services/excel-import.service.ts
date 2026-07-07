@@ -151,10 +151,6 @@ export class ExcelImportService {
     return out;
   }
 
-  // -------------------------------------------------------------------------
-  // Import pipeline
-  // -------------------------------------------------------------------------
-
   /**
    * Parse an uploaded Excel file and validate every row.
    *
@@ -525,10 +521,6 @@ export class ExcelImportService {
     return { errors, warnings };
   }
 
-  // -------------------------------------------------------------------------
-  // Apply validated drafts to the catalog
-  // -------------------------------------------------------------------------
-
   /**
    * Generate a preview of what the import will do — which families will be
    * created vs updated, which variants will be created vs updated, and any
@@ -720,7 +712,6 @@ export class ExcelImportService {
 
       const existing = existingByCode.get(code);
       if (existing) {
-        // Update the existing family's fields.
         existing.name = head.familyName;
         existing.category = head.category as ProductCategory;
         existing.description = head.description || '';
@@ -743,7 +734,6 @@ export class ExcelImportService {
           const overrides = this.buildOverrides(draft, parts, head);
           const existingVariant = existingVariantsBySku.get(draft.variantSku);
           if (existingVariant) {
-            // Update in place.
             existingVariant.label = draft.variantLabel || 'Standard';
             existingVariant.active = true;
             existingVariant.overrides = overrides;

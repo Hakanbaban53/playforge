@@ -6,12 +6,12 @@
 
 .shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   height: 100vh;
   transition: grid-template-columns var(--motion-base);
 
   &--collapsed {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr);
   }
 
   /* Mobile: single column, sidebar is an overlay drawer */
@@ -105,24 +105,6 @@
     cursor: pointer;
   }
 
-  &__close-btn {
-    margin-left: auto;
-    border: none;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.6);
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-
-    &:active {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-    }
-  }
-
   &__nav {
     flex: 1 1 auto;
     min-height: 0;
@@ -131,15 +113,6 @@
     gap: 4px;
     margin-top: 8px;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-
-    &::-webkit-scrollbar { width: 6px; }
-    &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 3px;
-    }
-    &::-webkit-scrollbar-track { background: transparent; }
   }
 
   &__footer {
@@ -154,7 +127,7 @@
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
+    width: var(--sidebar-width);
     max-width: 85vw;
     transition: transform var(--motion-base);
     z-index: 100;
@@ -341,7 +314,7 @@
   background: rgba(255, 255, 255, 0.05);
   padding: 5px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .content {

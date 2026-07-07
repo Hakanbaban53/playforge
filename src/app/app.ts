@@ -3,7 +3,9 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { IconComponent } from './shared/components/icon.component';
 import { ToasterComponent } from './shared/components/toaster.component';
+import { UpdateBannerComponent } from './shared/components/update-banner.component';
 import { InvoiceService } from './core/services/invoice.service';
+import { UpdateService } from './core/services/update.service';
 import { environment } from '../environments/environment';
 
 interface NavItem {
@@ -22,15 +24,15 @@ interface NavItem {
  */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToasterComponent, TranslatePipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToasterComponent, TranslatePipe, UpdateBannerComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
   private readonly invoice = inject(InvoiceService);
+  readonly updateService = inject(UpdateService);
 
   protected readonly title = 'PlayForge';
-  /** App version, injected at build time (see `src/environments/`). */
   readonly version = environment.version;
 
   readonly sidebarCollapsed = signal(false);

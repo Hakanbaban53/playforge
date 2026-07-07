@@ -1,6 +1,6 @@
 .page {
-  padding: 28px 32px 48px;
-  max-width: 1480px;
+  padding: var(--page-padding-y) var(--page-padding-x) 48px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
 
   &__head {
@@ -52,19 +52,7 @@
 }
 
 .alert {
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
   margin-bottom: 16px;
-
-  &--error {
-    background: var(--danger-50);
-    color: var(--danger-700);
-    border: 1px solid var(--danger-500);
-  }
 }
 
 .pdf-info {
@@ -74,7 +62,7 @@
   font-size: 12px;
   color: var(--brand-700);
   background: var(--brand-50);
-  border: 1px solid var(--brand-200);
+  box-shadow: 0 0 0 1px var(--brand-200);
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   margin-bottom: 14px;
@@ -146,7 +134,7 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 3px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 
@@ -175,7 +163,7 @@
 .line-item {
   padding: 12px;
   background: var(--surface-50);
-  border: 1px solid var(--surface-200);
+  box-shadow: 0 0 0 1px var(--surface-200);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
@@ -237,7 +225,7 @@
   &__size {
     font-size: 10px;
     background: var(--surface-100);
-    border: 1px solid var(--surface-200);
+    box-shadow: 0 0 0 1px var(--surface-200);
     color: var(--text-muted);
     padding: 1px 6px;
     border-radius: 999px;
@@ -326,7 +314,7 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
     }
   }
 
@@ -419,7 +407,7 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
     }
   }
 
@@ -438,7 +426,7 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
     }
   }
 
@@ -464,7 +452,7 @@
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px rgba(31, 157, 86, 0.12);
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
     }
   }
 
@@ -548,7 +536,7 @@
   &:focus {
     outline: none;
     border-color: var(--brand-400);
-    box-shadow: 0 0 0 3px rgba(31, 157, 86, 0.12);
+    box-shadow: 0 0 0 3px var(--brand-focus-ring);
   }
 }
 
@@ -581,34 +569,12 @@
   }
 }
 
-.preview-scroll {
-  max-height: calc(100vh - 140px);
-  min-height: 320px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--surface-300) transparent;
-
-  &::-webkit-scrollbar { width: 8px; }
-  &::-webkit-scrollbar-thumb {
-    background: var(--surface-300);
-    border-radius: 4px;
-  }
-  &::-webkit-scrollbar-track { background: transparent; }
-}
-
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
   .preview-pane {
     position: static;
-  }
-  /* On tablet, the preview still gets its own scroll area so the page
-   * doesn't grow unboundedly. */
-  .preview-scroll {
-    max-height: 70vh;
   }
 }
 
@@ -677,11 +643,6 @@
     }
   }
 
-  .preview-scroll {
-    /* On mobile, the preview still needs its own scroll area so the
-     * page doesn't grow unboundedly. */
-    max-height: 60vh;
-    min-height: 240px;
-  }
+
 
 }

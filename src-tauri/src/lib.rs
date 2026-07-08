@@ -156,7 +156,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
-            let b = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+            #[allow(unused_mut)]
+            let mut b = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("PlayForge")
                 .inner_size(800.0, 630.0)
                 .resizable(true)

@@ -124,7 +124,7 @@
       } @else {
         <div class="invoices-list">
           @for (inv of savedInvoices(); track inv.id) {
-            <article class="surface-card invoice-card" [class.invoice-card--quote]="inv.meta.docType === 'quote'">
+            <article class="surface-card invoice-card">
               <div class="invoice-card__head">
                 <span class="invoice-card__type" [class.invoice-card__type--quote]="inv.meta.docType === 'quote'">
                   {{ (inv.meta.docType === 'quote' ? 'quote.quote' : 'quote.invoice') | translate }}

@@ -60,7 +60,6 @@
   <div class="layout">
     <!-- ===================== Editor (left) ===================== -->
     <div class="editor">
-      <!-- Customer & meta -->
       <section class="surface-card card">
         <h3 class="card__title">{{ 'invoice.details' | translate }}</h3>
         <div class="form-grid">
@@ -157,7 +156,6 @@
         </div>
       </section>
 
-      <!-- Line items -->
       <section class="surface-card card">
         <h3 class="card__title">{{ 'invoice.lineItems' | translate: { count: active().lines.length } }}</h3>
 
@@ -271,7 +269,6 @@
         }
       </section>
 
-      <!-- Taxes -->
       <section class="surface-card card">
         <div class="card__head">
           <h3 class="card__title">{{ 'invoice.taxes' | translate }}</h3>
@@ -335,7 +332,6 @@
         }
       </section>
 
-      <!-- Notes -->
       <section class="surface-card card">
         <h3 class="card__title">{{ 'invoice.notes' | translate }}</h3>
         <textarea
@@ -356,11 +352,6 @@
           <span class="muted">{{ active().meta.paperSize }}</span>
         </div>
 
-        <!--
-          Live preview — uses ReceiptPreviewComponent (the same component the
-          receipt editor uses). Any layout changes made in the receipt editor
-          are immediately reflected here.
-        -->
         <app-receipt-preview
           [invoice]="active()"
           [layout]="layout()"

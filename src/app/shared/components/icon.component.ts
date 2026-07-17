@@ -49,6 +49,6 @@ export class IconComponent {
 
   readonly svgContent = computed<SafeHtml>(() => {
     const svg = ICON_PATHS[this.name()];
-    return this.sanitizer.bypassSecurityTrustHtml(svg ?? ICON_PATHS['help']);
+    return this.sanitizer.bypassSecurityTrustHtml(svg ?? ICON_PATHS.help);
   });
 }

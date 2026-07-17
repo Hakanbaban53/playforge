@@ -76,11 +76,11 @@ export interface ImportValidationResult {
 }
 
 /** What will happen to a draft when imported (merge mode). */
-export type ImportAction = 'create-family' | 'update-family' | 'create-variant' | 'update-variant';
+export type ImportAction = 'create-family' | 'update-family' | 'create-variant' | 'update-variant' | 'create-customer' | 'update-customer';
 
 /** Per-draft preview: what action will be taken and any conflicts. */
 export interface ImportPreviewRow {
-  draft: ImportedProductDraft;
+  draft: ImportedProductDraft | ImportedCustomerDraft;
   action: ImportAction;
   /** True if the row is selected for import (user can toggle). */
   selected: boolean;
@@ -95,7 +95,30 @@ export interface ImportPreview {
   updatedFamilies: number;
   newVariants: number;
   updatedVariants: number;
+  newCustomers: number;
+  updatedCustomers: number;
   conflicts: number;
+}
+
+/** Draft of a customer row parsed from the import workbook. */
+export interface ImportedCustomerDraft {
+  /** Row number in the spreadsheet (1-indexed, header row excluded). */
+  rowIndex: number;
+  name: string;
+  taxId: string;
+  email: string;
+  phone: string;
+  address: string;
+  notes: string;
+}
+
+/** Validation result for customer import. */
+export interface CustomerImportValidationResult {
+  valid: ImportedCustomerDraft[];
+  invalid: ImportedCustomerDraft[];
+  errors: ImportRowError[];
+  warnings: ImportRowError[];
+  totalRows: number;
 }
 
 /**
@@ -123,3 +146,19 @@ export type TemplateColumnKey = keyof typeof TEMPLATE_COLUMNS;
 /** All supported languages — used to build the reverse-header map. */
 export const SUPPORTED_LANGS = ['en', 'tr'] as const;
 export type SupportedLang = (typeof SUPPORTED_LANGS)[number];
+
+/**
+ * Customer template column-key → i18n key map.
+ * Same pattern as TEMPLATE_COLUMNS: the i18n key resolves to a translated
+ * header when generating or parsing the customer template.
+ */
+export const CUSTOMER_TEMPLATE_COLUMNS = {
+  name: 'importColumns.customerName',
+  taxId: 'importColumns.customerTaxId',
+  email: 'importColumns.customerEmail',
+  phone: 'importColumns.customerPhone',
+  address: 'importColumns.customerAddress',
+  notes: 'importColumns.customerNotes',
+} as const;
+
+export type CustomerTemplateColumnKey = keyof typeof CUSTOMER_TEMPLATE_COLUMNS;

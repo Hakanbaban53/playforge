@@ -47,7 +47,6 @@ export class CustomersPage {
   readonly editingId = signal<string | null>(null);
   readonly isCreating = signal(false);
 
-  // Form fields
   readonly fName = signal('');
   readonly fTaxId = signal('');
   readonly fEmail = signal('');
@@ -67,9 +66,7 @@ export class CustomersPage {
     return inv.meta.customerName || this.i18n.t('customers.noInvoices');
   }
 
-  // ---------------------------------------------------------------------------
-  // Form actions
-  // ---------------------------------------------------------------------------
+  // ---- Form actions ----
 
   startCreate(): void {
     this.editingId.set(null);
@@ -142,9 +139,7 @@ export class CustomersPage {
     void this.router.navigate(['/invoice']);
   }
 
-  // ---------------------------------------------------------------------------
-  // Saved-invoice actions
-  // ---------------------------------------------------------------------------
+  // ---- Saved-invoice actions ----
 
   /** Clone a saved invoice back into the active editor. */
   cloneToEditor(inv: Invoice): void {
@@ -160,9 +155,7 @@ export class CustomersPage {
     this.toast.info('toast.deleted');
   }
 
-  // ---------------------------------------------------------------------------
-  // Form input helpers
-  // ---------------------------------------------------------------------------
+  // ---- Form input helpers ----
 
   onInput(target: 'name' | 'taxId' | 'email' | 'phone' | 'address' | 'notes', event: Event): void {
     const v = (event.target as HTMLInputElement | HTMLTextAreaElement).value;

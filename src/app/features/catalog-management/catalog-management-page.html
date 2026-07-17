@@ -59,15 +59,15 @@
           </h3>
 
           <div class="form-grid">
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.familyName' | translate }}</span>
               <input [value]="fName()" (input)="set(fName, $event)" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.familyCode' | translate }}</span>
               <input [value]="fCode()" (input)="set(fCode, $event)" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'common.category' | translate }}</span>
               <select [value]="fCategory()" (change)="setProductCategory($event)">
                 @for (cat of productCategories; track cat) {
@@ -75,7 +75,7 @@
                 }
               </select>
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'common.currency' | translate }}</span>
               <select [value]="fCurrency()" (change)="setCurrency($event)">
                 <option value="USD">USD</option>
@@ -83,23 +83,23 @@
                 <option value="TRY">TRY</option>
               </select>
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.ageRange' | translate }}</span>
               <input [value]="fAgeRange()" (input)="set(fAgeRange, $event)" placeholder="3-12 yrs" />
             </label>
-            <label class="f-field f-field--full">
+            <label class="field field--compact field--full">
               <span>{{ 'catalogMgmt.tags' | translate }}</span>
               <input [value]="fTags()" (input)="set(fTags, $event)" placeholder="outdoor, modular" />
             </label>
-            <label class="f-field f-field--full">
+            <label class="field field--compact field--full">
               <span>{{ 'common.description' | translate }}</span>
               <textarea rows="3" [value]="fDescription()" (input)="set(fDescription, $event)"></textarea>
             </label>
-            <label class="f-field f-field--full">
+            <label class="field field--compact field--full">
               <span>{{ 'catalogMgmt.images' | translate }} (URL, {{ 'common.primary' | translate }} first)</span>
               <textarea rows="2" [value]="fImages()" (input)="set(fImages, $event)" placeholder="https://..."></textarea>
             </label>
-            <label class="f-field f-field--full">
+            <label class="field field--compact field--full">
               <span>{{ 'catalogMgmt.uploadImage' | translate }}</span>
               <input
                 type="file"
@@ -169,7 +169,7 @@
             <div class="variants-list">
               @for (v of variants(); track v.id) {
                 <div class="variant-row">
-                  <div class="variant-row__main">
+                  <div>
                     <div class="variant-row__label">{{ v.label }}</div>
                     <div class="variant-row__sku mono">{{ v.sku }}</div>
                   </div>
@@ -212,7 +212,7 @@
             <div class="parts-list">
               @for (p of fam.availableParts; track p.id) {
                 <div class="part-row">
-                  <div class="part-row__main">
+                  <div>
                     <div class="part-row__name">
                       {{ p.name }}
                       @if (p.required) { <span class="req-tag">{{ 'common.required' | translate }}</span> }
@@ -245,23 +245,23 @@
           </h3>
 
           <div class="form-grid">
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.variantLabel' | translate }}</span>
               <input [value]="fVariantLabel()" (input)="set(fVariantLabel, $event)" placeholder="5m" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.variantSku' | translate }}</span>
               <input [value]="fVariantSku()" (input)="set(fVariantSku, $event)" placeholder="TWR-5M" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'common.size' | translate }}</span>
               <input [value]="fVariantSize()" (input)="set(fVariantSize, $event)" placeholder="5m" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'common.price' | translate }}</span>
               <input type="number" min="0" step="0.01" [value]="fVariantPrice()" (input)="setNum(fVariantPrice, $event)" />
             </label>
-            <label class="f-field f-field--inline">
+            <label class="field field--compact field--inline">
               <input type="checkbox" [checked]="fVariantActive()" (change)="setBool(fVariantActive, $event)" />
               <span>{{ 'catalogMgmt.active' | translate }}</span>
             </label>
@@ -282,15 +282,15 @@
           </h3>
 
           <div class="form-grid">
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.partName' | translate }}</span>
               <input [value]="fPartName()" (input)="set(fPartName, $event)" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.partSku' | translate }}</span>
               <input [value]="fPartSku()" (input)="set(fPartSku, $event)" />
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.partCategory' | translate }}</span>
               <select [value]="fPartCategory()" (change)="setPartCategory($event)">
                 @for (cat of partCategories; track cat) {
@@ -298,15 +298,15 @@
                 }
               </select>
             </label>
-            <label class="f-field">
+            <label class="field field--compact">
               <span>{{ 'catalogMgmt.partPrice' | translate }}</span>
               <input type="number" min="0" step="0.01" [value]="fPartPrice()" (input)="setNum(fPartPrice, $event)" />
             </label>
-            <label class="f-field f-field--inline">
+            <label class="field field--compact field--inline">
               <input type="checkbox" [checked]="fPartRequired()" (change)="setBool(fPartRequired, $event)" />
               <span>{{ 'catalogMgmt.partRequired' | translate }}</span>
             </label>
-            <label class="f-field f-field--full">
+            <label class="field field--compact field--full">
               <span>{{ 'catalogMgmt.partDesc' | translate }}</span>
               <textarea rows="2" [value]="fPartDesc()" (input)="set(fPartDesc, $event)"></textarea>
             </label>

@@ -1,7 +1,5 @@
 .page {
   padding: 24px 28px 48px;
-  max-width: var(--app-max-width);
-  margin: 0 auto;
 
   &__head {
     display: flex;
@@ -17,8 +15,7 @@
 }
 
 .head-actions {
-  display: flex;
-  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .add-toolbar {
@@ -62,7 +59,6 @@
   .small { font-size: 11px; }
 }
 
-/* =================== Editor pane =================== */
 .editor-pane {
   display: flex;
   flex-direction: column;
@@ -90,15 +86,24 @@
   background: var(--surface-50);
   box-shadow: 0 0 0 1px transparent;
   cursor: pointer;
-  transition: background var(--motion-fast), border-color var(--motion-fast);
+  transition: background var(--motion-fast), box-shadow var(--motion-fast);
 
   &:hover {
     background: var(--surface-100);
   }
 
+  /* Selected item — brand-tinted background + brand edge. */
   &--selected {
     background: var(--brand-50);
-    border-color: var(--brand-400);
+    box-shadow: 0 0 0 1.5px var(--brand-400);
+  }
+
+  /* Hover on a SELECTED item — keep the selected tint, intensify the
+     edge. Without this, the plain :hover above would override --selected
+     and the item would appear unselected on hover (UX bug). */
+  &--selected:hover {
+    background: var(--brand-100);
+    box-shadow: 0 0 0 1.5px var(--brand-500);
   }
 
   &--hidden {
@@ -143,7 +148,6 @@
   }
 }
 
-/* CDK drag styles */
 .cdk-drag-preview {
   box-sizing: border-box;
   border-radius: var(--radius-sm);
@@ -168,7 +172,6 @@
   transition: transform var(--motion-base);
 }
 
-/* =================== Element editor =================== */
 .element-editor {
   padding: 16px 18px;
 
@@ -291,53 +294,8 @@
 }
 
 .stepper {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  box-shadow: 0 0 0 1px var(--surface-300);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--surface-0);
-
-  button {
-    border: none;
-    background: var(--surface-100);
-    color: var(--text-muted);
-    width: 28px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 700;
-    display: grid;
-    place-items: center;
-
-    &:hover {
-      background: var(--surface-200);
-      color: var(--text-strong);
-    }
-
-    &:active {
-      background: var(--brand-500);
-      color: #fff;
-    }
-  }
-
   input {
-    flex: 1;
-    border: none;
-    border-left: 1px solid var(--surface-300);
-    border-right: 1px solid var(--surface-300);
-    text-align: center;
-    padding: 5px 6px;
-    font-size: 12px;
-    font-family: var(--font-mono);
-    color: var(--text-base);
-    background: var(--surface-0);
-    min-width: 50px;
-
-    &:focus {
-      outline: none;
-      background: var(--brand-50);
-    }
+    min-width: 60px;
   }
 }
 
@@ -350,7 +308,6 @@
   font-size: 14px;
 }
 
-/* =================== Preview pane =================== */
 .preview-pane {
   position: sticky;
   top: 14px;
@@ -444,7 +401,4 @@
       padding: 7px 4px;
     }
   }
-
-
-
 }

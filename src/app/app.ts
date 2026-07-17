@@ -1,5 +1,6 @@
-import { Component, computed, inject, signal, DestroyRef } from '@angular/core';
+import { Component, computed, inject, signal, DestroyRef, Type } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { NgComponentOutlet } from '@angular/common';
 import { TranslatePipe } from '@ngx-translate/core';
 import { IconComponent } from './shared/components/icon.component';
 import { ToasterComponent } from './shared/components/toaster.component';
@@ -21,10 +22,19 @@ interface NavItem {
  * Desktop (≥900px): fixed sidebar with hover-to-collapse toggle on the
  * brand icon. The toggle button is hidden by default and appears on hover.
  * Mobile (<900px): slide-in drawer with backdrop + top bar hamburger.
+ *
+ * Dev tools:
+ *   The `<app-dev-tools>` panel is lazy-loaded via dynamic import only when
+ *   `!environment.production`. In a production build, `environment.production`
+ *   is statically `true` (via `fileReplacements` in `angular.json`), so the
+ *   `if` branch is dead code and the bundler tree-shakes the entire
+ *   DevToolsComponent + MockDataService + their icon references out of the
+ *   production bundle. This keeps the dev-only mock-data seeder out of the
+ *   shipped app with zero runtime cost.
  */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToasterComponent, TranslatePipe, UpdateBannerComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgComponentOutlet, IconComponent, ToasterComponent, TranslatePipe, UpdateBannerComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -38,6 +48,14 @@ export class App {
   readonly sidebarCollapsed = signal(false);
   readonly mobileDrawerOpen = signal(false);
   readonly isMobile = signal(false);
+
+  /**
+   * Lazily-loaded DevToolsComponent. Populated only in dev mode via a
+   * dynamic import. Stays `null` in production builds, so the
+   * `<ng-container *ngComponentOutlet>...` block renders nothing.
+   */
+  private readonly _devToolsComponent = signal<Type<unknown> | null>(null);
+  readonly devToolsComponent = this._devToolsComponent.asReadonly();
 
   readonly navItems: readonly NavItem[] = [
     { labelKey: 'nav.catalog', route: '/catalog', icon: 'grid_view', descKey: 'nav.catalogDesc' },
@@ -67,6 +85,16 @@ export class App {
     destroyRef.onDestroy(() => {
       window.removeEventListener('resize', this.onResizeBound);
     });
+
+    // Lazy-load dev tools only in non-production builds. The static
+    // `environment.production` check is replaced at build time (via
+    // fileReplacements), so the entire dynamic-import chain becomes
+    // dead code in production and gets tree-shaken.
+    if (!environment.production) {
+      void import('./shared/components/dev-tools.component')
+        .then((m) => this._devToolsComponent.set(m.DevToolsComponent))
+        .catch((err) => console.warn('[DevTools] failed to load:', err));
+    }
   }
 
   private readonly onResizeBound = (): void => this.checkMobile();

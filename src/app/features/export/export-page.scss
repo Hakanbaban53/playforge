@@ -1,13 +1,5 @@
 .page {
-  padding: var(--page-padding-y) var(--page-padding-x) 48px;
   max-width: var(--app-max-width-narrow);
-  margin: 0 auto;
-
-  &__head {
-    margin-bottom: 22px;
-    h1 { font-size: 26px; letter-spacing: -0.02em; }
-    p { margin-top: 6px; max-width: 600px; }
-  }
 }
 
 .alert {
@@ -21,57 +13,16 @@
   margin-bottom: 16px;
 }
 
-.card {
-  padding: 18px 20px;
-
-  &__title {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    margin-bottom: 8px;
-  }
-
-  p { margin-bottom: 14px; }
+.card__title {
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 
 .stats-row {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
   margin-bottom: 14px;
 }
 
-.stat {
-  background: var(--surface-50);
-  box-shadow: 0 0 0 1px var(--surface-200);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  text-align: center;
-
-  &__value {
-    display: block;
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--brand-600);
-  }
-
-  &__label {
-    font-size: 11px;
-    color: var(--text-subtle);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 2px;
-  }
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* =================== Family selection =================== */
 .family-select-head {
   display: flex;
   justify-content: space-between;
@@ -119,10 +70,23 @@
   background: var(--surface-0);
   box-shadow: 0 0 0 1px var(--surface-200);
   cursor: pointer;
-  transition: border-color var(--motion-fast);
+  transition: box-shadow var(--motion-fast), background var(--motion-fast);
 
   &:hover {
-    border-color: var(--brand-300);
+    box-shadow: 0 0 0 1px var(--brand-300);
+    background: var(--surface-50);
+  }
+
+  /* Checked row — brand-tinted bg + brand edge. */
+  &:has(input:checked) {
+    background: var(--brand-50);
+    box-shadow: 0 0 0 1px var(--brand-400);
+  }
+
+  /* Hover on a CHECKED row — keep the brand tint, intensify. */
+  &:has(input:checked):hover {
+    background: var(--brand-100);
+    box-shadow: 0 0 0 1.5px var(--brand-500);
   }
 
   input[type='checkbox'] {
@@ -149,35 +113,10 @@
   }
 }
 
-.reference-card {
-  grid-column: auto;
-}
-
-.ref-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  margin-top: 8px;
-
-  th, td {
-    text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--surface-200);
-    vertical-align: top;
-  }
-
-  th {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    background: var(--surface-50);
-  }
-
-  td:first-child {
-    font-weight: 600;
-    color: var(--text-strong);
-  }
+.template-hint {
+  margin-top: 10px;
+  font-style: italic;
+  opacity: 0.85;
 }
 
 @media (max-width: 800px) {

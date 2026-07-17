@@ -33,6 +33,19 @@ export class FavoritesService {
     return next.has(variantId);
   }
 
+  /** Replace the entire favorites list (used by settings import). */
+  replaceAll(ids: string[]): void {
+    const next = new Set(ids.filter((id) => typeof id === 'string' && id.length > 0));
+    this._ids.set(next);
+    this.persist();
+  }
+
+  /** Remove all favorites. */
+  clear(): void {
+    this._ids.set(new Set());
+    this.persist();
+  }
+
   readonly count = computed(() => this._ids().size);
 
   private load(): Set<string> {

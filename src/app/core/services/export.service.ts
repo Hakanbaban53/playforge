@@ -2,13 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import * as XLSX from 'xlsx';
 import { CatalogService } from './catalog.service';
 import { InvoiceService } from './invoice.service';
+import { CustomersService } from './customers.service';
 import { I18nService } from './i18n.service';
-import { TEMPLATE_COLUMNS } from '../models/import.model';
+import { AppSettingsService } from './app-settings.service';
+import { TEMPLATE_COLUMNS, CUSTOMER_TEMPLATE_COLUMNS, CustomerTemplateColumnKey } from '../models/import.model';
 import { ProductFamily, ProductVariant, Part } from '../models/catalog.model';
-import { Invoice, InvoiceLine } from '../models/invoice.model';
+import { Invoice, InvoiceLine, lineTotal } from '../models/invoice.model';
 
-export type ExportFormat = 'xlsx' | 'csv';
-export type ExportDataset = 'catalog' | 'invoices';
+export type ExportFormat = 'xlsx' | 'csv' | 'json';
+export type ExportDataset = 'catalog' | 'invoices' | 'customers' | 'settings';
 
 /**
  * Export service — generates XLSX or CSV files for the catalog and saved
@@ -32,7 +34,9 @@ export type ExportDataset = 'catalog' | 'invoices';
 export class ExportService {
   private readonly catalog = inject(CatalogService);
   private readonly invoiceService = inject(InvoiceService);
+  private readonly customersService = inject(CustomersService);
   private readonly i18n = inject(I18nService);
+  private readonly appSettings = inject(AppSettingsService);
 
   /**
    * Export the catalog (families + variants + parts) as a workbook with
@@ -74,6 +78,71 @@ export class ExportService {
       : this.toXlsxBlob([headers, ...rows], this.i18n.t('invoice.title'));
   }
 
+  /**
+   * Export all customers as a workbook with the same column structure as the
+   * customer import template.
+   */
+  exportCustomers(format: ExportFormat): Blob {
+    const headers = this.customerTranslatedHeaders();
+    const rows = this.buildCustomerRows();
+    return format === 'csv'
+      ? this.toCsvBlob([headers, ...rows])
+      : this.toXlsxBlob([headers, ...rows], this.i18n.t('import.customersSheet'));
+  }
+
+  /**
+   * Export app settings (receipt layout, invoice defaults, currency rates,
+   * favorites) as a single JSON bundle. Picked JSON over Excel because
+   * the four shapes are heterogeneous and would lose fidelity in a tabular
+   * format — see `AppSettingsService` for the bundle schema.
+   */
+  exportAppSettings(): Blob {
+    return this.appSettings.exportAsJson();
+  }
+
+  /**
+   * Build a JSON template (skeleton) for the app-settings bundle. Every
+   * section is present but empty — just enough to show the schema. The
+   * template round-trips through the import validator: every section is
+   * valid (empty defaults pass), so a user can fill in just the parts
+   * they want to apply and import it back.
+   *
+   * The favorites array is left empty (not omitted) so users see the
+   * key. The receiptLayout section uses a single placeholder element so
+   * the validator passes (it requires a non-empty array).
+   */
+  exportAppSettingsTemplate(): Blob {
+    const template = {
+      version: 1,
+      app: 'PlayForge',
+      exportedAt: 0,
+      receiptLayout: [
+        {
+          id: 'example-element',
+          type: 'text',
+          visible: true,
+          labelKey: 'receipt.elementText',
+          content: '',
+          styles: {},
+        },
+      ],
+      invoiceDefaults: {
+        paperSize: 'A4',
+        currency: 'USD',
+        vatPercent: 0,
+        sellerBlock: '',
+        notes: '',
+      },
+      currency: {
+        rates: { USD: 1, TRY: 32, EUR: 0.92 },
+        base: 'USD',
+      },
+      favorites: [] as string[],
+    };
+    const json = JSON.stringify(template, null, 2);
+    return new Blob([json], { type: 'application/json;charset=utf-8' });
+  }
+
   triggerDownload(blob: Blob, fileName: string): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -107,8 +176,8 @@ export class ExportService {
           family.category,
           variant.label,
           variant.sku,
-          sizeOv && sizeOv.key === 'size' ? sizeOv.value : '',
-          priceOv && priceOv.key === 'price' ? priceOv.value : 0,
+          sizeOv?.key === 'size' ? sizeOv.value : '',
+          priceOv?.key === 'price' ? priceOv.value : 0,
           family.currency,
           family.ageRange ?? '',
           family.description,
@@ -136,7 +205,7 @@ export class ExportService {
 
   private resolveParts(family: ProductFamily, variant: ProductVariant): Part[] {
     const partsOv = variant.overrides.find((o) => o.key === 'parts');
-    if (partsOv && partsOv.key === 'parts') {
+    if (partsOv?.key === 'parts') {
       const byId = new Map(family.availableParts.map((p) => [p.id, p]));
       return partsOv.value.map((id) => byId.get(id)).filter((p): p is Part => p != null);
     }
@@ -145,7 +214,7 @@ export class ExportService {
 
   private resolveImages(family: ProductFamily, variant: ProductVariant): string[] {
     const imgOv = variant.overrides.find((o) => o.key === 'images');
-    if (imgOv && imgOv.key === 'images') {
+    if (imgOv?.key === 'images') {
       return imgOv.value.map((i) => i.url);
     }
     return family.images.map((i) => i.url);
@@ -216,9 +285,30 @@ export class ExportService {
       line.quantity,
       line.unitPrice,
       line.unitPrice * line.quantity,
+      lineTotal(line),
       inv.meta.currency,
       inv.meta.paperSize,
     ];
+  }
+
+  // ---- Customer rows ----
+
+  private customerTranslatedHeaders(): string[] {
+    return (Object.keys(CUSTOMER_TEMPLATE_COLUMNS) as CustomerTemplateColumnKey[]).map(
+      (key) => this.i18n.t(CUSTOMER_TEMPLATE_COLUMNS[key]),
+    );
+  }
+
+  private buildCustomerRows(): (string | number)[][] {
+    const customers = this.customersService.customers();
+    return customers.map((c) => [
+      c.name,
+      c.taxId ?? '',
+      c.email ?? '',
+      c.phone ?? '',
+      c.address ?? '',
+      c.notes ?? '',
+    ]);
   }
 
   // ---- Blob converters ----
@@ -231,7 +321,7 @@ export class ExportService {
     });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31) || 'Sheet1');
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as BlobPart;
     return new Blob([buf], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });

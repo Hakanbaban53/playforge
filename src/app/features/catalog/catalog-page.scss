@@ -1,8 +1,4 @@
 .page {
-  padding: var(--page-padding-y) var(--page-padding-x) 48px;
-  max-width: var(--app-max-width);
-  margin: 0 auto;
-
   &__head {
     display: flex;
     align-items: flex-start;
@@ -10,16 +6,6 @@
     gap: 24px;
     margin-bottom: 28px;
     flex-wrap: wrap;
-
-    h1 {
-      font-size: 26px;
-      letter-spacing: -0.02em;
-    }
-
-    p {
-      margin-top: 6px;
-      max-width: 600px;
-    }
   }
 
   &__head-search {
@@ -102,9 +88,22 @@
     font-weight: 600;
   }
 
+  /* Hover on an ACTIVE chip — keep the brand tint, intensify the edge. */
+  &--active:hover {
+    background: var(--brand-100);
+    border-color: var(--brand-400);
+  }
+
   &--favorite.filter-chip--active {
     background: var(--warn-50);
     color: var(--warn-500);
+    border-color: var(--warn-500);
+  }
+
+  /* Hover on an ACTIVE favorite chip — keep the warn tint, intensify the
+     border color since --warn-100/--warn-700 aren't in the palette. */
+  &--favorite.filter-chip--active:hover {
+    background: color-mix(in srgb, var(--warn-50) 70%, var(--warn-500) 13%);
     border-color: var(--warn-500);
   }
 
@@ -154,7 +153,6 @@
   transition: transform var(--motion-base), box-shadow var(--motion-base);
 
   &:hover {
-    transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 
     .card__media img {
@@ -288,7 +286,6 @@
     display: flex;
     flex-direction: column;
     line-height: 1.1;
-    /* Let the price shrink when the actions need room. */
     min-width: 0;
   }
 
@@ -326,7 +323,6 @@
 }
 
 .empty-state {
-  /* catalog-page empty-state spans the full grid */
   grid-column: 1 / -1;
 }
 

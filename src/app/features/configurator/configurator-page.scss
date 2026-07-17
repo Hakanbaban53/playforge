@@ -1,20 +1,6 @@
 .page {
-  padding: var(--page-padding-y) var(--page-padding-x) 48px;
-  max-width: var(--app-max-width);
-  margin: 0 auto;
-
   &__head {
     margin-bottom: 24px;
-
-    h1 {
-      font-size: 26px;
-      letter-spacing: -0.02em;
-    }
-
-    p {
-      margin-top: 6px;
-      max-width: 600px;
-    }
   }
 }
 
@@ -40,13 +26,21 @@
 
   &:hover {
     border-color: var(--brand-300);
-    transform: translateY(-1px);
   }
 
   &--active {
     border-color: var(--brand-500);
     background: var(--brand-50);
     box-shadow: 0 4px 14px rgba(31, 157, 86, 0.18);
+  }
+
+  /* Hover on an ACTIVE tile — intensify the brand edge instead of
+     reverting to the lighter hover color. Without this, :hover would
+     override --active's border-color and the tile would look unselected
+     while the user is interacting with it. */
+  &--active:hover {
+    border-color: var(--brand-600);
+    background: var(--brand-100);
   }
 
   &__code {
@@ -151,16 +145,27 @@
   box-shadow: 0 0 0 1px var(--surface-200);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color var(--motion-fast), background var(--motion-fast);
+  transition: box-shadow var(--motion-fast), background var(--motion-fast);
 
+  /* Hover on an UNSELECTED row — light gray surface + subtle brand edge. */
   &:hover {
-    border-color: var(--brand-300);
+    box-shadow: 0 0 0 1px var(--brand-300);
     background: var(--surface-0);
   }
 
+  /* Selected row — brand-tinted background + thicker brand edge. */
   &--selected {
-    border-color: var(--brand-400);
+    box-shadow: 0 0 0 1.5px var(--brand-400);
     background: var(--brand-50);
+  }
+
+  /* Hover on a SELECTED row — keep the selected tint, intensify the edge
+     so the user gets hover feedback without losing the selection cue.
+     Without this rule, the plain :hover above would override --selected
+     and the row would appear unselected on hover. */
+  &--selected:hover {
+    box-shadow: 0 0 0 1.5px var(--brand-500);
+    background: var(--brand-100);
   }
 
   input[type='checkbox'] {
@@ -237,48 +242,11 @@
   }
 }
 
-.qty-stepper {
-  display: flex;
-  align-items: center;
-  box-shadow: 0 0 0 1px var(--surface-300);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--surface-0);
-
-  button {
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: var(--surface-100);
-    color: var(--text-muted);
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-
-    &:hover {
-      background: var(--surface-200);
-      color: var(--text-strong);
-    }
-  }
-
-  input {
-    width: 36px;
-    border: none;
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-base);
-    background: transparent;
-    -moz-appearance: textfield;
-    appearance: textfield;
-
-    &::-webkit-outer-spin-button,
-    &::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-  }
-}
+/* Note: the .qty-stepper class was removed — the configurator's quantity
+   stepper now uses the shared global `.stepper .stepper--sm` classes defined
+   in styles.scss. The receipt-editor's font-size stepper uses `.stepper`.
+   Both share the same :hover / :active / :focus-visible behavior, so the
+   "pressing one +/- button highlights both" bug is fixed at the source. */
 
 .summary-pane {
   display: flex;
@@ -378,7 +346,10 @@
 }
 
 .total-card {
-  padding: 18px 20px;
+  /* Pairs with `.surface-card` (which supplies background / border / shadow /
+     radius but no padding). Use theme spacing tokens so this panel matches
+     the spacing scale used across the app rather than a one-off px value. */
+  padding: var(--space-5) var(--space-6);
 
   h3 {
     font-size: 14px;
@@ -466,7 +437,6 @@
 }
 
 .empty-state {
-  /* configurator empty-state gets extra bottom margin when followed by other content */
   &:not(:last-child) {
     margin-bottom: 20px;
   }
@@ -537,17 +507,17 @@
     }
   }
 
-  .qty-stepper {
-    button {
-      width: 32px;
-      height: 32px;
-    }
+  /* Touch-friendly sizing for the configurator's compact stepper.
+     Overrides the global `.stepper--sm` defaults (24×24 button, 36px input). */
+  .stepper--sm button {
+    width: 32px;
+    height: 32px;
+  }
 
-    input {
-      width: 44px;
-      font-size: 14px;
-      padding: 6px 4px;
-    }
+  .stepper--sm input {
+    width: 44px;
+    font-size: 14px;
+    padding: 6px 4px;
   }
 
   .suggestion {

@@ -30,6 +30,7 @@ export class I18nService {
     await firstValueFrom(this.translate.use(initial));
     this.lang.set(initial);
     this.syncHtmlLang(initial);
+    this.syncDocumentTitle();
   }
 
   use(lang: AppLanguage): void {
@@ -37,6 +38,7 @@ export class I18nService {
     this.lang.set(lang);
     this.storage.write(STORAGE_KEY, lang);
     this.syncHtmlLang(lang);
+    this.syncDocumentTitle();
   }
 
   t(key: string, params?: Record<string, unknown>): string {
@@ -60,6 +62,21 @@ export class I18nService {
   private syncHtmlLang(lang: AppLanguage): void {
     if (typeof document !== 'undefined') {
       document.documentElement.lang = lang;
+    }
+  }
+
+  /**
+   * Keep the browser tab title in sync with the active language. The title
+   * text itself is just a translated string (`app.title`), so switching to
+   * Turkish updates both `<html lang>` and `document.title` together —
+   * previously the title stayed English even after switching languages
+   * because index.html hard-coded `<title>PlayForge</title>`.
+   */
+  private syncDocumentTitle(): void {
+    if (typeof document === 'undefined') return;
+    const title = this.translate.instant('app.title') as string;
+    if (title && title !== 'app.title') {
+      document.title = title;
     }
   }
 }

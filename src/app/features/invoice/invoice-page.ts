@@ -70,6 +70,10 @@ export class InvoicePage {
 
   updateMeta(event: Event, key: keyof InvoiceMeta): void {
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+    if (key === 'docType') {
+      this.invoiceService.setDocType(value as 'quote' | 'invoice');
+      return;
+    }
     this.invoiceService.updateMeta({ [key]: value });
   }
 

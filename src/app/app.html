@@ -96,3 +96,7 @@
 
 <app-toaster />
 
+@if (devToolsComponent()) {
+  <ng-container *ngComponentOutlet="devToolsComponent()!" />
+}
+

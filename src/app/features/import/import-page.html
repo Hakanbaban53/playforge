@@ -1,18 +1,45 @@
 <section class="page">
   <header class="page__head">
-    <div>
-      <h1>{{ 'import.title' | translate }}</h1>
-      <p class="muted">{{ 'import.subtitle' | translate }}</p>
-    </div>
+    <h1>{{ 'import.title' | translate }}</h1>
+    <p class="muted">{{ 'import.subtitle' | translate }}</p>
   </header>
 
+  <div class="target-selector">
+    <label class="radio-card" [class.radio-card--active]="importTarget() === 'catalog'">
+      <input type="radio" name="importTarget" value="catalog" [checked]="importTarget() === 'catalog'" (change)="setTarget('catalog')" />
+      <div class="radio-card__content">
+        <div class="radio-card__title">{{ 'import.targetCatalog' | translate }}</div>
+        <div class="radio-card__desc">{{ 'import.targetCatalogDesc' | translate }}</div>
+      </div>
+    </label>
+    <label class="radio-card" [class.radio-card--active]="importTarget() === 'customers'">
+      <input type="radio" name="importTarget" value="customers" [checked]="importTarget() === 'customers'" (change)="setTarget('customers')" />
+      <div class="radio-card__content">
+        <div class="radio-card__title">{{ 'import.targetCustomers' | translate }}</div>
+        <div class="radio-card__desc">{{ 'import.targetCustomersDesc' | translate }}</div>
+      </div>
+    </label>
+    <label class="radio-card" [class.radio-card--active]="importTarget() === 'settings'">
+      <input type="radio" name="importTarget" value="settings" [checked]="importTarget() === 'settings'" (change)="setTarget('settings')" />
+      <div class="radio-card__content">
+        <div class="radio-card__title">{{ 'import.targetSettings' | translate }}</div>
+        <div class="radio-card__desc">{{ 'import.targetSettingsDesc' | translate }}</div>
+      </div>
+    </label>
+  </div>
+
   <div class="layout">
-    <!-- Step 1: Download template -->
     <div class="step surface-card">
       <div class="step__num">1</div>
       <div class="step__body">
         <h3>{{ 'import.step1Title' | translate }}</h3>
-        <p class="muted">{{ 'import.step1Desc' | translate }}</p>
+        <p class="muted">
+          @switch (importTarget()) {
+            @case ('customers') { {{ 'import.step1DescCustomers' | translate }} }
+            @case ('settings')  { {{ 'import.step1DescSettings'  | translate }} }
+            @default            { {{ 'import.step1Desc' | translate }} }
+          }
+        </p>
         <app-button variant="secondary" size="md" (click)="downloadTemplate()">
           <app-icon name="download" [size]="16" />
           {{ 'import.downloadTemplate' | translate }}
@@ -27,7 +54,6 @@
       </div>
     </div>
 
-    <!-- Step 2: Upload -->
     <div
       class="step surface-card dropzone"
       [class.dropzone--drag]="isDragging()"
@@ -50,11 +76,11 @@
         <label class="file-picker">
           <input
             type="file"
-            accept=".xlsx,.xls"
+            [accept]="importTarget() === 'settings' ? '.json,application/json' : '.xlsx,.xls'"
             (change)="onFileSelected($event)"
             [disabled]="isParsing()"
           />
-          <span class="file-picker__label">{{ 'import.browse' | translate }}</span>
+          <span>{{ 'import.browse' | translate }}</span>
         </label>
 
         @if (errorMessage()) {
@@ -66,8 +92,7 @@
       </div>
     </div>
 
-    <!-- Step 3: Validation results + Preview -->
-    @if (result()) {
+    @if (importTarget() === 'settings' && settingsResult()) {
       <div class="step surface-card">
         <div class="step__num">3</div>
         <div class="step__body">
@@ -75,27 +100,105 @@
 
           <div class="stats-row">
             <div class="stat">
-              <span class="stat__value">{{ result()!.totalRows }}</span>
+              <span class="stat__value">{{ settingsSections().length }}</span>
+              <span class="stat__label">{{ 'import.settingsSectionsFound' | translate }}</span>
+            </div>
+            <div class="stat stat--ok">
+              <span class="stat__value">{{ settingsSelectedSectionCount() }}</span>
+              <span class="stat__label">{{ 'import.settingsSectionsSelected' | translate }}</span>
+            </div>
+            <div class="stat stat--err">
+              <span class="stat__value">{{ settingsSectionErrors().length }}</span>
+              <span class="stat__label">{{ 'import.invalid' | translate }}</span>
+            </div>
+          </div>
+
+          @if (settingsSectionErrors().length > 0) {
+            <h4 class="error-list-title">{{ 'import.errors' | translate: { count: settingsSectionErrors().length } }}</h4>
+            <div class="error-table">
+              @for (err of settingsSectionErrors(); track err.section + ':' + $index) {
+                <div class="error-row error-row--error">
+                  <span class="error-row__row">{{ sectionErrorLabel(err.section) }}</span>
+                  <span class="error-row__col">—</span>
+                  <span class="error-row__msg">{{ err.message }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (settingsSections().length > 0) {
+            <h4 class="preview-title">{{ 'import.settingsSectionsTitle' | translate }}</h4>
+            <div class="preview-table">
+              @for (section of settingsSections(); track section) {
+                <div
+                  class="preview-row" role="button" tabindex="0"
+                  [class.preview-row--deselected]="!isSectionSelected(section)"
+                  (click)="toggleSection(section)"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="isSectionSelected(section)"
+                    (change)="toggleSection(section)"
+                    (click)="$event.stopPropagation()"
+                  />
+                  <span class="preview-row__action action--update-family">
+                    {{ 'import.settingsSection' | translate }}
+                  </span>
+                  <div class="preview-row__info">
+                    <div class="preview-row__name">{{ sectionLabel(section) }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="apply-bar">
+            <app-button variant="ghost" size="md" (click)="reset()">
+              {{ 'import.startOver' | translate }}
+            </app-button>
+            <app-button
+              variant="primary"
+              size="md"
+              [disabled]="settingsSelectedSectionCount() === 0"
+              (click)="applyImport()"
+            >
+              <app-icon name="check" [size]="16" />
+              {{ 'import.importSelected' | translate: { count: settingsSelectedSectionCount() } }}
+            </app-button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (importTarget() !== 'settings' && activeResult()) {
+      <div class="step surface-card">
+        <div class="step__num">3</div>
+        <div class="step__body">
+          <h3>{{ 'import.validationResults' | translate }}</h3>
+
+          <div class="stats-row">
+            <div class="stat">
+              <span class="stat__value">{{ activeTotalRows() }}</span>
               <span class="stat__label">{{ 'import.totalRows' | translate }}</span>
             </div>
             <div class="stat stat--ok">
-              <span class="stat__value">{{ result()!.valid.length }}</span>
+              <span class="stat__value">{{ activeValidCount() }}</span>
               <span class="stat__label">{{ 'import.valid' | translate }}</span>
             </div>
             <div class="stat stat--err">
-              <span class="stat__value">{{ result()!.invalid.length }}</span>
+              <span class="stat__value">{{ activeInvalidCount() }}</span>
               <span class="stat__label">{{ 'import.invalid' | translate }}</span>
             </div>
             <div class="stat stat--warn">
-              <span class="stat__value">{{ result()!.warnings.length }}</span>
+              <span class="stat__value">{{ activeWarnings().length }}</span>
               <span class="stat__label">{{ 'import.warnings' | translate }}</span>
             </div>
           </div>
 
-          @if (result()!.errors.length > 0) {
-            <h4 class="error-list-title">{{ 'import.errors' | translate: { count: result()!.errors.length } }}</h4>
+          @if (activeErrors().length > 0) {
+            <h4 class="error-list-title">{{ 'import.errors' | translate: { count: activeErrors().length } }}</h4>
             <div class="error-table">
-              @for (err of result()!.errors; track err.rowIndex + ':' + err.columnKey + ':' + $index) {
+              @for (err of activeErrors(); track err.rowIndex + ':' + err.columnKey + ':' + $index) {
                 <div class="error-row error-row--error">
                   <span class="error-row__row">Row {{ err.rowIndex }}</span>
                   <span class="error-row__col">{{ err.columnKey | translate }}</span>
@@ -105,10 +208,10 @@
             </div>
           }
 
-          @if (result()!.warnings.length > 0) {
-            <h4 class="error-list-title">{{ 'import.warnings' | translate: { count: result()!.warnings.length } }}</h4>
+          @if (activeWarnings().length > 0) {
+            <h4 class="error-list-title">{{ 'import.warnings' | translate: { count: activeWarnings().length } }}</h4>
             <div class="error-table">
-              @for (warn of result()!.warnings; track warn.rowIndex + ':' + warn.columnKey + ':' + $index) {
+              @for (warn of activeWarnings(); track warn.rowIndex + ':' + warn.columnKey + ':' + $index) {
                 <div class="error-row error-row--warn">
                   <span class="error-row__row">Row {{ warn.rowIndex }}</span>
                   <span class="error-row__col">{{ warn.columnKey | translate }}</span>
@@ -118,30 +221,33 @@
             </div>
           }
 
-          <!-- Preview table: what will happen -->
-          @if (preview() && preview()!.rows.length > 0) {
+          @if (activePreview() && activePreview()!.rows.length > 0) {
             <h4 class="preview-title">{{ 'import.previewTitle' | translate }}</h4>
 
-            <!-- Summary badges -->
             <div class="preview-summary">
-              @if (preview()!.newFamilies > 0) {
-                <span class="badge badge--create">{{ 'import.previewNewFamilies' | translate: { count: preview()!.newFamilies } }}</span>
+              @if (activePreview()!.newFamilies > 0) {
+                <span class="badge badge--create">{{ 'import.previewNewFamilies' | translate: { count: activePreview()!.newFamilies } }}</span>
               }
-              @if (preview()!.updatedFamilies > 0) {
-                <span class="badge badge--update">{{ 'import.previewUpdatedFamilies' | translate: { count: preview()!.updatedFamilies } }}</span>
+              @if (activePreview()!.updatedFamilies > 0) {
+                <span class="badge badge--update">{{ 'import.previewUpdatedFamilies' | translate: { count: activePreview()!.updatedFamilies } }}</span>
               }
-              @if (preview()!.newVariants > 0) {
-                <span class="badge badge--create">{{ 'import.previewNewVariants' | translate: { count: preview()!.newVariants } }}</span>
+              @if (activePreview()!.newVariants > 0) {
+                <span class="badge badge--create">{{ 'import.previewNewVariants' | translate: { count: activePreview()!.newVariants } }}</span>
               }
-              @if (preview()!.updatedVariants > 0) {
-                <span class="badge badge--update">{{ 'import.previewUpdatedVariants' | translate: { count: preview()!.updatedVariants } }}</span>
+              @if (activePreview()!.updatedVariants > 0) {
+                <span class="badge badge--update">{{ 'import.previewUpdatedVariants' | translate: { count: activePreview()!.updatedVariants } }}</span>
               }
-              @if (preview()!.conflicts > 0) {
-                <span class="badge badge--conflict">{{ 'import.previewConflicts' | translate: { count: preview()!.conflicts } }}</span>
+              @if (activePreview()!.newCustomers > 0) {
+                <span class="badge badge--create">{{ 'import.previewNewCustomers' | translate: { count: activePreview()!.newCustomers } }}</span>
+              }
+              @if (activePreview()!.updatedCustomers > 0) {
+                <span class="badge badge--update">{{ 'import.previewUpdatedCustomers' | translate: { count: activePreview()!.updatedCustomers } }}</span>
+              }
+              @if (activePreview()!.conflicts > 0) {
+                <span class="badge badge--conflict">{{ 'import.previewConflicts' | translate: { count: activePreview()!.conflicts } }}</span>
               }
             </div>
 
-            <!-- Select all / deselect all -->
             <div class="preview-actions">
               <button type="button" class="link-btn" (click)="selectAll()">{{ 'import.selectAll' | translate }}</button>
               <span class="muted small">·</span>
@@ -149,9 +255,8 @@
               <span class="muted small">{{ 'import.selectedCount' | translate: { count: selectedCount() } }}</span>
             </div>
 
-            <!-- Row-by-row preview -->
             <div class="preview-table">
-              @for (row of preview()!.rows; track row.draft.rowIndex) {
+              @for (row of activePreview()!.rows; track row.draft.rowIndex) {
                 <div
                   class="preview-row" role="button" tabindex="0"
                   [class.preview-row--conflict]="row.conflicts.length > 0"
@@ -168,17 +273,9 @@
                     {{ actionLabel(row.action) | translate }}
                   </span>
                   <div class="preview-row__info">
-                    <div class="preview-row__name">{{ row.draft.familyName }}</div>
+                    <div class="preview-row__name">{{ previewRowName(row) }}</div>
                     <div class="preview-row__meta">
-                      <span class="mono">{{ row.draft.familyCode }}</span>
-                      <span class="dot">·</span>
-                      <span class="mono">{{ row.draft.variantSku }}</span>
-                      @if (row.draft.size) {
-                        <span class="dot">·</span>
-                        <span>{{ row.draft.size }}</span>
-                      }
-                      <span class="dot">·</span>
-                      <span>{{ row.draft.price }} {{ row.draft.currency }}</span>
+                      {{ previewRowMeta(row) }}
                     </div>
                     @if (row.conflicts.length > 0) {
                       <div class="preview-row__conflicts">
@@ -193,9 +290,8 @@
             </div>
           }
 
-          <!-- Mode selector -->
           <div class="mode-selector">
-            <label class="mode-option">
+            <label class="radio-card">
               <input
                 type="radio"
                 name="importMode"
@@ -203,12 +299,12 @@
                 [checked]="importMode() === 'merge'"
                 (change)="setMode('merge')"
               />
-              <div class="mode-option__content">
-                <div class="mode-option__title">{{ 'import.modeMerge' | translate }}</div>
-                <div class="mode-option__desc">{{ 'import.modeMergeDesc' | translate }}</div>
+              <div class="radio-card__content">
+                <div class="radio-card__title">{{ 'import.modeMerge' | translate }}</div>
+                <div class="radio-card__desc">{{ 'import.modeMergeDesc' | translate }}</div>
               </div>
             </label>
-            <label class="mode-option">
+            <label class="radio-card">
               <input
                 type="radio"
                 name="importMode"
@@ -216,9 +312,9 @@
                 [checked]="importMode() === 'replace'"
                 (change)="setMode('replace')"
               />
-              <div class="mode-option__content">
-                <div class="mode-option__title">{{ 'import.modeReplace' | translate }}</div>
-                <div class="mode-option__desc">{{ 'import.modeReplaceDesc' | translate }}</div>
+              <div class="radio-card__content">
+                <div class="radio-card__title">{{ 'import.modeReplace' | translate }}</div>
+                <div class="radio-card__desc">{{ 'import.modeReplaceDesc' | translate }}</div>
               </div>
             </label>
           </div>
@@ -241,8 +337,7 @@
       </div>
     }
 
-    <!-- Applied confirmation -->
-    @if (applied()) {
+    @if (applied() || customerApplied() || settingsApplied()) {
       <div class="step surface-card confirm-card anim-scale-in">
         <div class="confirm-icon">
           <app-icon name="check" [size]="28" />
@@ -250,14 +345,20 @@
         <div class="step__body">
           <h3>{{ 'import.importComplete' | translate }}</h3>
           <p class="muted">
-            @if (applied()!.created > 0 && applied()!.updated > 0) {
-              {{ 'import.mergedBoth' | translate: { created: applied()!.created, updated: applied()!.updated, familiesTotal: stats().families, variantsTotal: stats().variants } }}
-            } @else if (applied()!.created > 0) {
-              {{ 'import.mergedCreated' | translate: { created: applied()!.created, familiesTotal: stats().families, variantsTotal: stats().variants } }}
-            } @else if (applied()!.updated > 0) {
-              {{ 'import.mergedUpdated' | translate: { updated: applied()!.updated, familiesTotal: stats().families, variantsTotal: stats().variants } }}
-            } @else {
-              {{ 'import.importedSummary' | translate: { families: applied()!.families, variants: applied()!.variants, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+            @if (settingsApplied()) {
+              {{ 'import.settingsAppliedSummary' | translate: { count: settingsApplied()!.applied.length } }}
+            } @else if (customerApplied()) {
+              {{ 'import.customerMergedSummary' | translate: { created: customerApplied()!.created, updated: customerApplied()!.updated, total: customerCount() } }}
+            } @else if (applied()) {
+              @if (applied()!.created > 0 && applied()!.updated > 0) {
+                {{ 'import.mergedBoth' | translate: { created: applied()!.created, updated: applied()!.updated, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+              } @else if (applied()!.created > 0) {
+                {{ 'import.mergedCreated' | translate: { created: applied()!.created, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+              } @else if (applied()!.updated > 0) {
+                {{ 'import.mergedUpdated' | translate: { updated: applied()!.updated, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+              } @else {
+                {{ 'import.importedSummary' | translate: { families: applied()!.families, variants: applied()!.variants, familiesTotal: stats().families, variantsTotal: stats().variants } }}
+              }
             }
           </p>
           <app-button variant="secondary" size="md" (click)="reset()">
@@ -267,50 +368,141 @@
       </div>
     }
 
-    <!-- Format reference -->
     <div class="step surface-card reference-card">
       <div class="step__body">
-        <h3>{{ 'import.formatReference' | translate }}</h3>
-        <p class="muted">{{ 'import.formatReferenceDesc' | translate }}</p>
+        @switch (importTarget()) {
+          @case ('settings') {
+            <h3>{{ 'import.formatReferenceSettingsTitle' | translate }}</h3>
+            <p class="muted">{{ 'import.formatReferenceSettingsDesc' | translate }}</p>
 
-        <div class="ref-table-wrap">
-          <table class="ref-table">
-            <thead>
-              <tr>
-                <th>{{ 'import.column' | translate }}</th>
-                <th>{{ 'import.format' | translate }}</th>
-                <th>{{ 'import.example' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>{{ 'importColumns.parts' | translate }}</td>
-                <td><code>name|sku|category|price; name|sku|category|price</code></td>
-                <td><code>Tower|TWR-1|structure|920; Slide|SLD-3|slide|410</code></td>
-              </tr>
-              <tr>
-                <td>{{ 'importColumns.images' | translate }}</td>
-                <td><code>url; url; url</code></td>
-                <td><code>https://example.com/a.jpg; https://example.com/b.jpg</code></td>
-              </tr>
-              <tr>
-                <td>{{ 'importColumns.tags' | translate }}</td>
-                <td><code>tag1, tag2, tag3</code></td>
-                <td><code>outdoor, modular, inclusive</code></td>
-              </tr>
-              <tr>
-                <td>{{ 'importColumns.category' | translate }}</td>
-                <td>{{ 'import.oneOfValues' | translate }}</td>
-                <td><code>slide</code></td>
-              </tr>
-              <tr>
-                <td>{{ 'importColumns.currency' | translate }}</td>
-                <td>{{ 'import.isoCode' | translate }}</td>
-                <td><code>USD</code></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            <div class="ref-table-wrap">
+              <table class="ref-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'import.formatReferenceSettingsSections' | translate }}</th>
+                    <th>{{ 'import.formatReferenceSettingsType' | translate }}</th>
+                    <th>{{ 'import.formatReferenceSettingsNotes' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>receiptLayout</code></td>
+                    <td><code>Array&lt;LayoutElement&gt;</code></td>
+                    <td>{{ 'import.formatReferenceSettingsReceiptLayoutNotes' | translate }}</td>
+                  </tr>
+                  <tr>
+                    <td><code>invoiceDefaults</code></td>
+                    <td><code>Object</code></td>
+                    <td>{{ 'import.formatReferenceSettingsInvoiceDefaultsNotes' | translate }}</td>
+                  </tr>
+                  <tr>
+                    <td><code>currency</code></td>
+                    <td><code>&#123; rates, base &#125;</code></td>
+                    <td>{{ 'import.formatReferenceSettingsCurrencyNotes' | translate }}</td>
+                  </tr>
+                  <tr>
+                    <td><code>favorites</code></td>
+                    <td><code>string[]</code></td>
+                    <td>{{ 'import.formatReferenceSettingsFavoritesNotes' | translate }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          }
+          @case ('customers') {
+            <h3>{{ 'import.formatReferenceCustomersTitle' | translate }}</h3>
+            <p class="muted">{{ 'import.formatReferenceCustomersDesc' | translate }}</p>
+
+            <div class="ref-table-wrap">
+              <table class="ref-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'import.column' | translate }}</th>
+                    <th>{{ 'import.format' | translate }}</th>
+                    <th>{{ 'import.example' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ 'importColumns.customerName' | translate }}</td>
+                    <td>{{ 'import.fmtPlainTextRequired' | translate }}</td>
+                    <td><code>Acme Playgrounds Co.</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.customerTaxId' | translate }}</td>
+                    <td>{{ 'import.fmtPlainText' | translate }}</td>
+                    <td><code>VAT123456789</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.customerEmail' | translate }}</td>
+                    <td>{{ 'import.fmtEmail' | translate }}</td>
+                    <td><code>info@acme.com</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.customerPhone' | translate }}</td>
+                    <td>{{ 'import.fmtPlainText' | translate }}</td>
+                    <td><code>+1 555 0100</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.customerAddress' | translate }}</td>
+                    <td>{{ 'import.fmtPlainText' | translate }}</td>
+                    <td><code>123 Maple St, Springfield</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.customerNotes' | translate }}</td>
+                    <td>{{ 'import.fmtPlainText' | translate }}</td>
+                    <td><code>Prefers email contact.</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p class="muted small ref-note">{{ 'import.customerColumnsNote' | translate }}</p>
+          }
+          @default {
+            <h3>{{ 'import.formatReferenceCatalogTitle' | translate }}</h3>
+            <p class="muted">{{ 'import.formatReferenceCatalogDesc' | translate }}</p>
+
+            <div class="ref-table-wrap">
+              <table class="ref-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'import.column' | translate }}</th>
+                    <th>{{ 'import.format' | translate }}</th>
+                    <th>{{ 'import.example' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ 'importColumns.parts' | translate }}</td>
+                    <td><code>name|sku|category|price; name|sku|category|price</code></td>
+                    <td><code>Tower|TWR-1|structure|920; Slide|SLD-3|slide|410</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.images' | translate }}</td>
+                    <td><code>url; url; url</code></td>
+                    <td><code>https://example.com/a.jpg; https://example.com/b.jpg</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.tags' | translate }}</td>
+                    <td><code>tag1, tag2, tag3</code></td>
+                    <td><code>outdoor, modular, inclusive</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.category' | translate }}</td>
+                    <td>{{ 'import.oneOfValues' | translate }}</td>
+                    <td><code>slide</code></td>
+                  </tr>
+                  <tr>
+                    <td>{{ 'importColumns.currency' | translate }}</td>
+                    <td>{{ 'import.isoCode' | translate }}</td>
+                    <td><code>USD</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          }
+        }
       </div>
     </div>
   </div>

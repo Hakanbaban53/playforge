@@ -1,21 +1,12 @@
 .page {
-  padding: var(--page-padding-y) var(--page-padding-x) 48px;
   max-width: var(--app-max-width-narrow);
-  margin: 0 auto;
+}
 
-  &__head {
-    margin-bottom: 24px;
-
-    h1 {
-      font-size: 26px;
-      letter-spacing: -0.02em;
-    }
-
-    p {
-      margin-top: 6px;
-      max-width: 600px;
-    }
-  }
+.target-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .layout {
@@ -123,50 +114,7 @@
 }
 
 .stats-row {
-  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 16px 0;
-}
-
-.stat {
-  background: var(--surface-50);
-  box-shadow: 0 0 0 1px var(--surface-200);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  text-align: center;
-
-  &__value {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text-strong);
-  }
-
-  &__label {
-    font-size: 11px;
-    color: var(--text-subtle);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 2px;
-  }
-
-  &--ok {
-    background: var(--success-50);
-    border-color: var(--success-500);
-    .stat__value { color: var(--success-500); }
-  }
-  &--err {
-    background: var(--danger-50);
-    border-color: var(--danger-500);
-    .stat__value { color: var(--danger-700); }
-  }
-  &--warn {
-    background: var(--warn-50);
-    border-color: var(--warn-500);
-    .stat__value { color: var(--warn-500); }
-  }
 }
 
 .error-list-title {
@@ -190,8 +138,6 @@
 }
 
 .error-row {
-  /* `1fr` → `minmax(0, 1fr)` so the message column wraps instead of
-   * pushing the row + col labels off-screen. */
   display: grid;
   grid-template-columns: 70px 160px minmax(0, 1fr);
   gap: 8px;
@@ -240,60 +186,6 @@
   margin-bottom: 4px;
 }
 
-.mode-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--surface-50);
-  border: 2px solid var(--surface-200);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: border-color var(--motion-fast), background var(--motion-fast);
-
-  &:hover {
-    border-color: var(--brand-300);
-    background: var(--surface-0);
-  }
-
-  input[type='radio'] {
-    margin-top: 2px;
-    accent-color: var(--brand-500);
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-  }
-
-  &__content {
-    flex: 1;
-  }
-
-  &__title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-strong);
-  }
-
-  &__desc {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 2px;
-    line-height: 1.4;
-  }
-
-  input:checked + .mode-option__content {
-    .mode-option__title {
-      color: var(--brand-700);
-    }
-  }
-}
-
-.mode-option:has(input:checked) {
-  border-color: var(--brand-500);
-  background: var(--brand-50);
-}
-
-/* =================== Preview table =================== */
 .preview-title {
   font-size: 13px;
   text-transform: uppercase;
@@ -363,15 +255,24 @@
   background: var(--surface-0);
   box-shadow: 0 0 0 1px var(--surface-200);
   cursor: pointer;
-  transition: border-color var(--motion-fast);
+  transition: box-shadow var(--motion-fast), background var(--motion-fast);
 
+  /* Hover on a NORMAL row — subtle brand edge. */
   &:hover {
-    border-color: var(--brand-300);
+    box-shadow: 0 0 0 1px var(--brand-300);
   }
 
+  /* Conflict row — warn-tinted bg + warn edge. */
   &--conflict {
-    border-color: var(--warn-500);
+    box-shadow: 0 0 0 1px var(--warn-500);
     background: var(--warn-50);
+  }
+
+  /* Hover on a CONFLICT row — intensify the warn edge (don't revert to
+     the brand-tinted hover of a normal row). */
+  &--conflict:hover {
+    box-shadow: 0 0 0 1.5px var(--warn-500);
+    background: color-mix(in srgb, var(--warn-50) 85%, var(--warn-500) 12%);
   }
 
   &--deselected {
@@ -476,6 +377,12 @@
   overflow: hidden;
 }
 
+.ref-note {
+  margin-top: 10px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 .ref-table-wrap {
   overflow-x: auto;
   overflow-y: auto;
@@ -545,6 +452,14 @@
     &__head h1 {
       font-size: 22px;
     }
+  }
+
+  .target-selector {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mode-selector {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .step {

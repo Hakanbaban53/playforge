@@ -1,28 +1,16 @@
 .page {
-  padding: var(--page-padding-y) var(--page-padding-x) 48px;
-  max-width: var(--app-max-width);
-  margin: 0 auto;
-
   &__head {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 16px;
-    margin-bottom: 22px;
     flex-wrap: wrap;
 
     h1 {
-      font-size: 26px;
-      letter-spacing: -0.02em;
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
-    }
-
-    p {
-      margin-top: 6px;
-      max-width: 600px;
     }
   }
 }
@@ -43,12 +31,6 @@
     background: var(--warn-50);
     color: var(--warn-500);
   }
-}
-
-.head-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .alert {
@@ -80,67 +62,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.card {
-  padding: 18px 20px;
-
-  &__title {
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    margin-bottom: 12px;
-  }
-
-  &__head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-
-    .card__title {
-      margin-bottom: 0;
-    }
-  }
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px 12px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
-
-  &--full {
-    grid-column: 1 / -1;
-  }
-
-  input, select, textarea {
-    border: 1px solid var(--surface-300);
-    border-radius: var(--radius-sm);
-    padding: 7px 10px;
-    font-size: 13px;
-    color: var(--text-base);
-    background: var(--surface-0);
-    font-family: inherit;
-
-    &:focus {
-      outline: none;
-      border-color: var(--brand-400);
-      box-shadow: 0 0 0 3px var(--brand-focus-ring);
-    }
-  }
-
-  textarea {
-    resize: vertical;
-  }
 }
 
 .empty-lines {
@@ -328,13 +249,11 @@
     }
   }
 
-  /* Qty: narrow, centered */
   &__input--qty {
     width: 56px;
     text-align: center;
   }
 
-  /* Discount: select + value side by side */
   &__discount {
     display: flex;
     gap: 4px;
@@ -351,7 +270,6 @@
     text-align: center;
   }
 
-  /* Unit price + total: display-only, right-aligned, grow to fill */
   &--price, &--total {
     flex: 1 1 auto;
     min-width: 90px;
@@ -370,7 +288,6 @@
     }
   }
 
-  /* Total gets the strongest visual weight */
   &--total {
     flex: 1.5 1 auto;
   }
@@ -540,7 +457,6 @@
   }
 }
 
-/* =================== Preview pane =================== */
 .preview-pane {
   position: sticky;
   top: 16px;
@@ -642,7 +558,4 @@
       margin-left: 0;
     }
   }
-
-
-
 }

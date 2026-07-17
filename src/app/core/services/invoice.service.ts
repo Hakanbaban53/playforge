@@ -188,6 +188,29 @@ export class InvoiceService {
     this._savedVersion.update((v) => v + 1);
   }
 
+  /**
+   * Push a fully-formed invoice into the saved list without disturbing the
+   * active draft. Used by the dev-mode mock data seeder to populate invoice
+   * history; not part of the normal user flow (which goes through
+   * `saveAndReset()`).
+   */
+  pushSaved(invoice: Invoice): void {
+    const all = this.storage.read<Invoice[]>(this.savedKey, []);
+    all.push(invoice);
+    this.storage.write(this.savedKey, all);
+    this._savedVersion.update((v) => v + 1);
+  }
+
+  /**
+   * Replace the entire saved-invoice list. Used by the dev-mode mock data
+   * seeder's wipe/refresh flow. Bumps `savedVersion` so reactive callers
+   * re-evaluate. The active invoice is left untouched.
+   */
+  replaceAllSaved(invoices: Invoice[]): void {
+    this.storage.write(this.savedKey, invoices);
+    this._savedVersion.update((v) => v + 1);
+  }
+
   /** Switch the active document between quote and invoice. Re-issues the
    *  document number with the appropriate prefix. */
   setDocType(docType: 'quote' | 'invoice'): void {

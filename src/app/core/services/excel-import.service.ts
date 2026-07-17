@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import * as XLSX from 'xlsx';
 import {
   ImportedProductDraft,
+  ImportedCustomerDraft,
+  CustomerImportValidationResult,
   ImportRowError,
   ImportValidationResult,
   ImportPreview,
@@ -11,6 +13,8 @@ import {
   SupportedLang,
   TEMPLATE_COLUMNS,
   TemplateColumnKey,
+  CUSTOMER_TEMPLATE_COLUMNS,
+  CustomerTemplateColumnKey,
 } from '../models/import.model';
 import {
   Part,
@@ -21,6 +25,7 @@ import {
   VariantOverride,
 } from '../models/catalog.model';
 import { CatalogService } from './catalog.service';
+import { CustomersService } from './customers.service';
 import { I18nService } from './i18n.service';
 
 /**
@@ -41,6 +46,7 @@ import { I18nService } from './i18n.service';
 @Injectable({ providedIn: 'root' })
 export class ExcelImportService {
   private readonly catalog = inject(CatalogService);
+  private readonly customersService = inject(CustomersService);
   private readonly i18n = inject(I18nService);
 
   private readonly validProductCategories: ProductCategory[] = [
@@ -131,7 +137,7 @@ export class ExcelImportService {
     referenceSheet['!cols'] = [{ wch: 28 }, { wch: 60 }];
     XLSX.utils.book_append_sheet(wb, referenceSheet, this.i18n.t('import.referenceSheet'));
 
-    return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
   }
 
   /** Translate every column header into the active language. */
@@ -194,7 +200,7 @@ export class ExcelImportService {
       ]);
     }
 
-    const headerRow = (rows[0]).map((c) => String(c ?? '').trim());
+    const headerRow = (rows[0]).map((c) => String((c as string | number | boolean) ?? '').trim());
     const colIndex = this.buildColumnIndex(headerRow);
 
     const errors: ImportRowError[] = [];
@@ -219,7 +225,7 @@ export class ExcelImportService {
     const dataRows = rows.slice(1);
     dataRows.forEach((rawRow, idx) => {
       const rowIndex = idx + 2;
-      const row = (rawRow).map((c) => (c == null ? '' : c));
+      const row = (rawRow).map((c) => c ?? '');
       const draft = this.parseRow(row, colIndex, rowIndex);
       drafts.push(draft);
     });
@@ -310,17 +316,28 @@ export class ExcelImportService {
     return map[i18nKey] ?? '';
   }
 
-  /** Coerce a cell to string. */
   private asString(v: unknown): string {
-    if (v == null) return '';
-    return String(v).trim();
+    if (typeof v === 'string') return v.trim();
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v).trim();
+    if (v instanceof Date) return v.toISOString().trim();
+    return '';
   }
 
   /** Coerce a cell to number, returning NaN on failure. */
   private asNumber(v: unknown): number {
     if (v == null || v === '') return NaN;
     if (typeof v === 'number') return v;
-    const cleaned = String(v).replace(/[^0-9.-]/g, '');
+    let strVal: string;
+    if (typeof v === 'string') {
+      strVal = v;
+    } else if (typeof v === 'boolean') {
+      strVal = String(v);
+    } else if (v instanceof Date) {
+      strVal = String(v.getTime());
+    } else {
+      return NaN;
+    }
+    const cleaned = strVal.replace(/[^0-9.-]/g, '');
     if (cleaned === '' || cleaned === '-' || cleaned === '.') return NaN;
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : NaN;
@@ -658,6 +675,8 @@ export class ExcelImportService {
       updatedFamilies,
       newVariants,
       updatedVariants,
+      newCustomers: 0,
+      updatedCustomers: 0,
       conflicts: conflictCount,
     };
   }
@@ -714,7 +733,7 @@ export class ExcelImportService {
       if (existing) {
         existing.name = head.familyName;
         existing.category = head.category as ProductCategory;
-        existing.description = head.description || '';
+        existing.description = head.description ?? '';
         existing.ageRange = head.ageRange;
         existing.currency = head.currency || 'USD';
         existing.tags = head.tags;
@@ -734,7 +753,7 @@ export class ExcelImportService {
           const overrides = this.buildOverrides(draft, parts, head);
           const existingVariant = existingVariantsBySku.get(draft.variantSku);
           if (existingVariant) {
-            existingVariant.label = draft.variantLabel || 'Standard';
+            existingVariant.label = draft.variantLabel ?? 'Standard';
             existingVariant.active = true;
             existingVariant.overrides = overrides;
             existingVariant.updatedAt = now;
@@ -743,7 +762,7 @@ export class ExcelImportService {
             const newVariant: ProductVariant = {
               id: crypto.randomUUID(),
               familyId: existing.id,
-              label: draft.variantLabel || 'Standard',
+              label: draft.variantLabel ?? 'Standard',
               sku: draft.variantSku,
               active: true,
               overrides,
@@ -760,9 +779,9 @@ export class ExcelImportService {
           name: head.familyName,
           code,
           category: head.category as ProductCategory,
-          description: head.description || '',
+          description: head.description ?? '',
           ageRange: head.ageRange,
-          currency: head.currency || 'USD',
+          currency: head.currency ?? 'USD',
           tags: head.tags,
           images,
           availableParts: parts,
@@ -778,7 +797,7 @@ export class ExcelImportService {
           const variant: ProductVariant = {
             id: crypto.randomUUID(),
             familyId: family.id,
-            label: draft.variantLabel || 'Standard',
+            label: draft.variantLabel ?? 'Standard',
             sku: draft.variantSku,
             active: true,
             overrides,
@@ -850,9 +869,9 @@ export class ExcelImportService {
         name: head.familyName,
         code,
         category: head.category as ProductCategory,
-        description: head.description || '',
+        description: head.description ?? '',
         ageRange: head.ageRange,
-        currency: head.currency || 'USD',
+        currency: head.currency ?? 'USD',
         tags: head.tags,
         images,
         availableParts: parts,
@@ -866,7 +885,7 @@ export class ExcelImportService {
         variants.push({
           id: crypto.randomUUID(),
           familyId: family.id,
-          label: draft.variantLabel || 'Standard',
+          label: draft.variantLabel ?? 'Standard',
           sku: draft.variantSku,
           active: true,
           overrides,
@@ -924,5 +943,345 @@ export class ExcelImportService {
       warnings: [],
       totalRows: 0,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Customer template generation + import
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generate the customer import template as an ArrayBuffer.
+   * A single "Customers" sheet with columns: Name, Tax ID, Email, Phone,
+   * Address, Notes. One example row is included.
+   */
+  generateCustomerTemplate(): ArrayBuffer {
+    const wb = XLSX.utils.book_new();
+
+    const header = this.customerTranslatedHeaders();
+    const exampleRow: (string | number)[] = [
+      'Acme Playground Co.',
+      'US123456789',
+      'info@acme-playground.com',
+      '+1 (555) 123-4567',
+      '123 Park Avenue, Cityville, ST 12345',
+      'Preferred customer — 30-day terms',
+    ];
+
+    const sheet = XLSX.utils.aoa_to_sheet([header, exampleRow]);
+    sheet['!cols'] = [
+      { wch: 28 }, { wch: 16 }, { wch: 28 }, { wch: 18 }, { wch: 36 }, { wch: 36 },
+    ];
+    XLSX.utils.book_append_sheet(wb, sheet, this.i18n.t('import.customersSheet'));
+
+    return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+  }
+
+  /** Translate customer column headers into the active language. */
+  private customerTranslatedHeaders(): string[] {
+    return (Object.keys(CUSTOMER_TEMPLATE_COLUMNS) as CustomerTemplateColumnKey[]).map(
+      (key) => this.i18n.t(CUSTOMER_TEMPLATE_COLUMNS[key]),
+    );
+  }
+
+  /**
+   * Parse an uploaded Excel file for customer data and validate every row.
+   */
+  async importCustomersFromFile(file: File): Promise<CustomerImportValidationResult> {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+
+    const sheetName: string | undefined =
+      wb.SheetNames.find((n) => this.isCustomersSheetName(n)) ?? wb.SheetNames[0];
+
+    const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
+    if (!sheet) {
+      return {
+        valid: [],
+        invalid: [],
+        errors: [{
+          rowIndex: 0,
+          columnKey: 'importErrors.sheetColumn',
+          severity: 'error',
+          messageKey: 'importErrors.missingSheet',
+        }],
+        warnings: [],
+        totalRows: 0,
+      };
+    }
+
+    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      blankrows: false,
+      defval: '',
+    });
+    if (rows.length < 2) {
+      return {
+        valid: [],
+        invalid: [],
+        errors: [{
+          rowIndex: 0,
+          columnKey: 'importErrors.sheetColumn',
+          severity: 'error',
+          messageKey: 'importErrors.noDataRows',
+        }],
+        warnings: [],
+        totalRows: 0,
+      };
+    }
+
+    const headerRow = (rows[0]).map((c) => String((c as string | number | boolean) ?? '').trim());
+    const colIndex = this.buildCustomerColumnIndex(headerRow);
+
+    const missingKeys = (Object.keys(CUSTOMER_TEMPLATE_COLUMNS) as CustomerTemplateColumnKey[]).filter(
+      (key) => colIndex[key] === -1,
+    );
+    const headerErrors: ImportRowError[] = [];
+    if (missingKeys.length > 0) {
+      headerErrors.push({
+        rowIndex: 0,
+        columnKey: 'importErrors.headerColumn',
+        severity: 'error',
+        messageKey: 'importErrors.missingHeaders',
+        messageParams: { columns: missingKeys.map((k) => this.i18n.t(CUSTOMER_TEMPLATE_COLUMNS[k])).join(', ') },
+      });
+    }
+
+    const drafts: ImportedCustomerDraft[] = [];
+    const dataRows = rows.slice(1);
+    dataRows.forEach((rawRow, idx) => {
+      const rowIndex = idx + 2;
+      const row = (rawRow).map((c) => c ?? '');
+      drafts.push(this.parseCustomerRow(row, colIndex, rowIndex));
+    });
+
+    const rowErrors: ImportRowError[] = [];
+    const valid: ImportedCustomerDraft[] = [];
+    const invalid: ImportedCustomerDraft[] = [];
+
+    for (const draft of drafts) {
+      const errs = this.validateCustomerDraft(draft);
+      rowErrors.push(...errs);
+      if (errs.length === 0) valid.push(draft);
+      else invalid.push(draft);
+    }
+
+    return {
+      valid,
+      invalid,
+      errors: [...headerErrors, ...rowErrors],
+      warnings: [],
+      totalRows: drafts.length,
+    };
+  }
+
+  private isCustomersSheetName(name: string): boolean {
+    return SUPPORTED_LANGS.some((lang) => {
+      const expected = lang === 'tr' ? 'Müşteriler' : 'Customers';
+      return name === expected;
+    });
+  }
+
+  private buildCustomerColumnIndex(headerRow: string[]): Record<string, number> {
+    const idx: Record<string, number> = {};
+    (Object.keys(CUSTOMER_TEMPLATE_COLUMNS) as CustomerTemplateColumnKey[]).forEach((key) => {
+      const i18nKey = CUSTOMER_TEMPLATE_COLUMNS[key];
+      const candidates = new Set<string>();
+      for (const lang of SUPPORTED_LANGS) {
+        const translated = this.translatedCustomerHeaderFor(i18nKey, lang);
+        if (translated) candidates.add(translated);
+      }
+      idx[key] = headerRow.findIndex((h) => candidates.has(h));
+    });
+    return idx;
+  }
+
+  private translatedCustomerHeaderFor(i18nKey: string, lang: SupportedLang): string {
+    const en: Record<string, string> = {
+      'importColumns.customerName': 'Customer Name',
+      'importColumns.customerTaxId': 'Tax ID',
+      'importColumns.customerEmail': 'Email',
+      'importColumns.customerPhone': 'Phone',
+      'importColumns.customerAddress': 'Address',
+      'importColumns.customerNotes': 'Notes',
+    };
+    const tr: Record<string, string> = {
+      'importColumns.customerName': 'Müşteri Adı',
+      'importColumns.customerTaxId': 'Vergi No',
+      'importColumns.customerEmail': 'E-posta',
+      'importColumns.customerPhone': 'Telefon',
+      'importColumns.customerAddress': 'Adres',
+      'importColumns.customerNotes': 'Notlar',
+    };
+    const map = lang === 'tr' ? tr : en;
+    return map[i18nKey] ?? '';
+  }
+
+  private parseCustomerRow(
+    row: unknown[],
+    colIndex: Record<string, number>,
+    rowIndex: number,
+  ): ImportedCustomerDraft {
+    const get = (key: CustomerTemplateColumnKey): unknown => {
+      const i = colIndex[key];
+      if (i < 0) return '';
+      return row[i] ?? '';
+    };
+    return {
+      rowIndex,
+      name: this.asString(get('name')),
+      taxId: this.asString(get('taxId')),
+      email: this.asString(get('email')),
+      phone: this.asString(get('phone')),
+      address: this.asString(get('address')),
+      notes: this.asString(get('notes')),
+    };
+  }
+
+  private validateCustomerDraft(draft: ImportedCustomerDraft): ImportRowError[] {
+    const errors: ImportRowError[] = [];
+    const row = draft.rowIndex;
+
+    if (!draft.name) {
+      errors.push({
+        rowIndex: row,
+        columnKey: CUSTOMER_TEMPLATE_COLUMNS.name,
+        severity: 'error',
+        messageKey: 'importErrors.required',
+        messageParams: { label: this.i18n.t(CUSTOMER_TEMPLATE_COLUMNS.name) },
+      });
+    }
+
+    if (draft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
+      errors.push({
+        rowIndex: row,
+        columnKey: CUSTOMER_TEMPLATE_COLUMNS.email,
+        severity: 'error',
+        messageKey: 'importErrors.badEmail',
+        messageParams: { value: draft.email },
+      });
+    }
+
+    return errors;
+  }
+
+  /**
+   * Generate a preview of what the customer import will do — which customers
+   * will be created vs updated (matched by name).
+   */
+  generateCustomerPreview(drafts: ImportedCustomerDraft[], mode: 'replace' | 'merge' = 'merge'): ImportPreview {
+    const existingByName = new Map(
+      this.customersService.customers().map((c) => [c.name.toLowerCase(), c]),
+    );
+
+    const seenNamesInFile = new Map<string, number>();
+    const firstNameIndex = new Map<string, number>();
+    drafts.forEach((d, idx) => {
+      const key = d.name.toLowerCase();
+      seenNamesInFile.set(key, (seenNamesInFile.get(key) ?? 0) + 1);
+      if (!firstNameIndex.has(key)) firstNameIndex.set(key, idx);
+    });
+
+    const rows: ImportPreviewRow[] = [];
+    let newCustomers = 0;
+    let updatedCustomers = 0;
+    let conflictCount = 0;
+
+    drafts.forEach((d, idx) => {
+      const key = d.name.toLowerCase();
+      const conflicts: string[] = [];
+
+      if ((seenNamesInFile.get(key) ?? 0) > 1 && firstNameIndex.get(key) !== idx) {
+        conflicts.push('duplicate_name_in_file');
+      }
+
+      let action: ImportAction;
+      if (mode === 'replace') {
+        action = 'create-customer';
+        newCustomers++;
+      } else {
+        if (existingByName.has(key)) {
+          action = 'update-customer';
+          updatedCustomers++;
+        } else {
+          action = 'create-customer';
+          newCustomers++;
+        }
+      }
+
+      if (conflicts.length > 0) conflictCount += conflicts.length;
+
+      rows.push({ draft: d, action, selected: conflicts.length === 0, conflicts });
+    });
+
+    return {
+      rows,
+      newFamilies: 0,
+      updatedFamilies: 0,
+      newVariants: 0,
+      updatedVariants: 0,
+      newCustomers,
+      updatedCustomers,
+      conflicts: conflictCount,
+    };
+  }
+
+  /**
+   * Apply validated customer drafts to the customer book.
+   * - `'replace'` clears all existing customers and writes only the imported rows.
+   * - `'merge'` keeps existing customers; if a customer with the same name
+   *   (case-insensitive) exists, it is updated; otherwise a new one is created.
+   */
+  applyCustomerDrafts(
+    drafts: ImportedCustomerDraft[],
+    mode: 'replace' | 'merge' = 'replace',
+  ): { created: number; updated: number } {
+    if (mode === 'replace') {
+      // Remove all existing customers first.
+      this.customersService.clearAll();
+      for (const d of drafts) {
+        this.customersService.add({
+          name: d.name,
+          taxId: d.taxId || undefined,
+          email: d.email || undefined,
+          phone: d.phone || undefined,
+          address: d.address || undefined,
+          notes: d.notes || undefined,
+        });
+      }
+      return { created: drafts.length, updated: 0 };
+    }
+
+    // Merge mode: match by name (case-insensitive).
+    let created = 0;
+    let updated = 0;
+    const existingByName = new Map(
+      this.customersService.customers().map((c) => [c.name.toLowerCase(), c]),
+    );
+
+    for (const d of drafts) {
+      const key = d.name.toLowerCase();
+      const existing = existingByName.get(key);
+      if (existing) {
+        this.customersService.update(existing.id, {
+          taxId: d.taxId || undefined,
+          email: d.email || undefined,
+          phone: d.phone || undefined,
+          address: d.address || undefined,
+          notes: d.notes || undefined,
+        });
+        updated++;
+      } else {
+        this.customersService.add({
+          name: d.name,
+          taxId: d.taxId || undefined,
+          email: d.email || undefined,
+          phone: d.phone || undefined,
+          address: d.address || undefined,
+          notes: d.notes || undefined,
+        });
+        created++;
+      }
+    }
+    return { created, updated };
   }
 }

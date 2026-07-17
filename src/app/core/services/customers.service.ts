@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Customer, CustomerInput } from '../models/customer.model';
 import { StorageService } from './storage.service';
+import { InvoiceService } from './invoice.service';
 
 /**
  * Customer book — a reusable list of billing targets.
@@ -15,6 +16,7 @@ import { StorageService } from './storage.service';
 @Injectable({ providedIn: 'root' })
 export class CustomersService {
   private readonly storage = inject(StorageService);
+  private readonly invoiceService = inject(InvoiceService);
   private readonly storageKey = 'customers';
 
   private readonly _customers = signal<Customer[]>(this.load());
@@ -50,6 +52,17 @@ export class CustomersService {
 
   remove(id: string): void {
     this._customers.update((list) => list.filter((c) => c.id !== id));
+    this.persist();
+    // Clear dangling customerId on active invoice if it references this customer.
+    const active = this.invoiceService.active();
+    if (active.meta.customerId === id) {
+      this.invoiceService.updateMeta({ customerId: undefined });
+    }
+  }
+
+  /** Remove all customers (used by replace-mode import and settings wipe). */
+  clearAll(): void {
+    this._customers.set([]);
     this.persist();
   }
 

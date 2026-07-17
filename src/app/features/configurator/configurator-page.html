@@ -1,14 +1,11 @@
 <section class="page">
   <header class="page__head">
-    <div>
-      <h1>{{ 'configurator.title' | translate }}</h1>
-      <p class="muted">
-        {{ 'configurator.subtitle' | translate }}
-      </p>
-    </div>
+    <h1>{{ 'configurator.title' | translate }}</h1>
+    <p class="muted">
+      {{ 'configurator.subtitle' | translate }}
+    </p>
   </header>
 
-  <!-- Family picker -->
   @if (families().length > 0) {
     <div class="family-bar">
       @for (fam of families(); track fam.id) {
@@ -36,7 +33,6 @@
 
   @if (family()) {
     <div class="layout">
-      <!-- Left: parts checklist -->
       <div class="parts-pane surface-card">
         <div class="parts-pane__head">
           <div>
@@ -99,7 +95,7 @@
                       </div>
 
                       @if (isPartSelected(part.id)) {
-                        <div class="qty-stepper" (click)="$event.stopPropagation()">
+                        <div class="stepper stepper--sm" (click)="$event.stopPropagation()">
                           <button type="button" (click)="decrement(part.id)" aria-label="Decrease quantity">
                             <app-icon name="remove" [size]="12" />
                           </button>
@@ -124,7 +120,6 @@
         </div>
       </div>
 
-      <!-- Right: summary & suggestion -->
       <aside class="summary-pane">
         @if (family()!.images.length > 0) {
           <div class="hero surface-card">
@@ -136,7 +131,6 @@
           </div>
         }
 
-        <!-- Reverse-match suggestion -->
         @if (exactMatch(); as exact) {
           <div class="suggestion suggestion--exact surface-card anim-scale-in">
             <div class="suggestion__icon">
@@ -190,7 +184,6 @@
           </div>
         }
 
-        <!-- Total -->
         <div class="total-card surface-card">
           <h3>{{ 'configurator.summary' | translate }}</h3>
 

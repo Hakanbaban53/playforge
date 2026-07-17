@@ -1,21 +1,5 @@
 .page {
-  padding: var(--page-padding-y) var(--page-padding-x) 48px;
   max-width: var(--app-max-width-narrow);
-  margin: 0 auto;
-
-  &__head {
-    margin-bottom: 22px;
-
-    h1 {
-      font-size: 26px;
-      letter-spacing: -0.02em;
-    }
-
-    p {
-      margin-top: 6px;
-      max-width: 600px;
-    }
-  }
 }
 
 .grid {
@@ -24,33 +8,16 @@
   gap: 16px;
 }
 
-.card {
-  padding: 18px 20px;
-
-  &--wide {
-    grid-column: 1 / -1;
-  }
-
-  &__title {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    margin-bottom: 12px;
-
-    &--danger {
-      color: var(--danger-500);
-    }
-  }
+.card__title {
+  font-size: 13px;
 
   &--danger {
-    border-color: var(--danger-500);
+    color: var(--danger-500);
   }
+}
 
-  p {
-    font-size: 13px;
-    margin-bottom: 12px;
-  }
+.card--danger {
+  border-color: var(--danger-500);
 }
 
 .stats {
@@ -59,27 +26,8 @@
   gap: 10px;
 }
 
-.stat {
-  background: var(--surface-50);
-  box-shadow: 0 0 0 1px var(--surface-200);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  text-align: center;
-
-  &__value {
-    display: block;
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--brand-600);
-  }
-
-  &__label {
-    font-size: 11px;
-    color: var(--text-subtle);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 2px;
-  }
+.stat__value {
+  font-size: 24px;
 }
 
 .setting-row {
@@ -191,30 +139,10 @@
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
   margin-top: 10px;
 
   span {
     font-weight: 600;
-  }
-
-  input, select {
-    border: 1px solid var(--surface-300);
-    border-radius: var(--radius-sm);
-    padding: 7px 10px;
-    font-size: 13px;
-    color: var(--text-base);
-    background: var(--surface-0);
-
-    &:focus {
-      outline: none;
-      border-color: var(--brand-400);
-      box-shadow: 0 0 0 3px var(--brand-focus-ring);
-    }
   }
 }
 
@@ -268,7 +196,6 @@
   }
 }
 
-/* Update section */
 .update-status {
   display: flex;
   align-items: center;
@@ -329,7 +256,6 @@
 
 .alert {
   margin-block: 8px;
-  /* Single-line text alerts in settings don't need the icon column. */
   display: block;
   padding: 8px 12px;
 }

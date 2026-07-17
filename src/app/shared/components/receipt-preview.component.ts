@@ -295,7 +295,7 @@ export class ReceiptPreviewComponent {
   );
 
   readonly subtotal = computed(() =>
-    this.invoice().lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0),
+    this.invoice().lines.reduce((sum, l) => sum + lineTotal(l), 0),
   );
 
   readonly activeTaxes = computed(() =>

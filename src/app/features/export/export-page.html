@@ -1,32 +1,14 @@
 <section class="page">
   <header class="page__head">
-    <div>
-      <h1>{{ 'export.title' | translate }}</h1>
-      <p class="muted">{{ 'export.subtitle' | translate }}</p>
-    </div>
+    <h1>{{ 'export.title' | translate }}</h1>
+    <p class="muted">{{ 'export.subtitle' | translate }}</p>
   </header>
 
-  @if (error()) {
-    <div class="alert alert--error">
-      <app-icon name="warning" [size]="14" />
-      {{ error() }}
-    </div>
-  }
-
-  @if (lastExport()) {
-    <div class="alert alert--success">
-      <app-icon name="check" [size]="14" />
-      {{ lastExport() }}
-    </div>
-  }
-
   <div class="grid">
-    <!-- Catalog export with family selection -->
     <div class="surface-card card card--wide">
       <h3 class="card__title">{{ 'export.catalogTitle' | translate }}</h3>
       <p class="muted small">{{ 'export.catalogDesc' | translate }}</p>
 
-      <!-- Family selection -->
       @if (families().length > 0) {
         <div class="family-select-head">
           <label class="family-select-all">
@@ -76,7 +58,6 @@
       }
     </div>
 
-    <!-- Invoice export -->
     <div class="surface-card card">
       <h3 class="card__title">{{ 'export.invoicesTitle' | translate }}</h3>
       <p class="muted small">{{ 'export.invoicesDesc' | translate }}</p>
@@ -102,6 +83,54 @@
           {{ 'export.exportCsv' | translate }}
         </app-button>
       </div>
+    </div>
+
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'export.customersTitle' | translate }}</h3>
+      <p class="muted small">{{ 'export.customersDesc' | translate }}</p>
+
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat__value">{{ customerCount() }}</span>
+          <span class="stat__label">{{ 'export.customerCount' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <app-button variant="primary" size="md" (click)="doCustomerExport('xlsx')">
+          <app-icon name="download" [size]="14" />
+          {{ 'export.exportXlsx' | translate }}
+        </app-button>
+        <app-button variant="secondary" size="md" (click)="doCustomerExport('csv')">
+          <app-icon name="download" [size]="14" />
+          {{ 'export.exportCsv' | translate }}
+        </app-button>
+      </div>
+    </div>
+
+    <div class="surface-card card">
+      <h3 class="card__title">{{ 'export.settingsTitle' | translate }}</h3>
+      <p class="muted small">{{ 'export.settingsDesc' | translate }}</p>
+
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat__value">{{ favoritesCount() }}</span>
+          <span class="stat__label">{{ 'export.favoritesCount' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <app-button variant="primary" size="md" (click)="doSettingsExport()">
+          <app-icon name="download" [size]="14" />
+          {{ 'export.exportJson' | translate }}
+        </app-button>
+        <app-button variant="ghost" size="md" (click)="doSettingsTemplate()">
+          <app-icon name="description" [size]="14" />
+          {{ 'export.downloadTemplate' | translate }}
+        </app-button>
+      </div>
+
+      <p class="muted small template-hint">{{ 'export.templateHint' | translate }}</p>
     </div>
   </div>
 </section>

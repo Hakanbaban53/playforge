@@ -41,6 +41,13 @@ export class ReceiptLayoutService {
     this.persist();
   }
 
+  /** Replace the entire layout (used by settings import). */
+  replaceAll(layout: LayoutElement[]): void {
+    const normalized = this.normalize(layout);
+    this._layout.set(normalized);
+    this.persist();
+  }
+
   /** Update an element by id with a partial patch. */
   updateElement(id: string, patch: Partial<LayoutElement>): void {
     this._layout.update((list) =>

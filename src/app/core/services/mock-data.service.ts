@@ -65,8 +65,8 @@ export class MockDataService {
    *
    * Returns the count of mock families now in storage (post-seed).
    */
-  seedCatalog(): number {
-    this.clearMockFamilies();
+  async seedCatalog(): Promise<number> {
+    await this.clearMockFamilies();
 
     const families = this.buildMockFamilies();
     const variants = this.buildMockVariants(families);
@@ -74,8 +74,9 @@ export class MockDataService {
     // The CatalogService's addFamily() generates its own id/timestamps, so
     // we feed it the family shape minus those fields. Parts are embedded on
     // the family record (availableParts) so they're added atomically.
-    const createdFamilies: ProductFamily[] = families.map((f) =>
-      this.catalog.addFamily({
+    const createdFamilies: ProductFamily[] = [];
+    for (const f of families) {
+      const created = await this.catalog.addFamily({
         name: f.name,
         code: f.code,
         category: f.category,
@@ -85,15 +86,16 @@ export class MockDataService {
         tags: f.tags,
         images: f.images,
         availableParts: f.availableParts,
-      }),
-    );
+      });
+      createdFamilies.push(created);
+    }
 
     // Variants reference familyId, so we map from the temp code → real id.
     const codeToFamilyId = new Map(createdFamilies.map((f) => [f.code, f.id]));
     for (const v of variants) {
       const familyId = codeToFamilyId.get(v.familyCode);
       if (!familyId) continue;
-      this.catalog.addVariant({
+      await this.catalog.addVariant({
         familyId,
         label: v.label,
         sku: v.sku,
@@ -110,12 +112,12 @@ export class MockDataService {
    * removes prior mock customers (those whose name starts with the mock
    * prefix) before inserting the fresh batch.
    */
-  seedCustomers(): number {
-    this.clearMockCustomers();
+  async seedCustomers(): Promise<number> {
+    await this.clearMockCustomers();
 
     const samples = this.buildMockCustomers();
     for (const c of samples) {
-      this.customers.add(c);
+      await this.customers.add(c);
     }
     return samples.length;
   }
@@ -125,13 +127,13 @@ export class MockDataService {
    * favorite. Requires the catalog to have mock variants already; if not,
    * this method runs `seedCatalog()` first.
    */
-  seedFavorites(): number {
+  async seedFavorites(): Promise<number> {
     const mockVariants = this.catalog
       .variants()
       .filter((v) => v.sku.startsWith(MockDataService.MOCK_PREFIX));
 
     if (mockVariants.length === 0) {
-      this.seedCatalog();
+      await this.seedCatalog();
     }
 
     const candidates = (this.catalog.variants() as readonly { id: string; sku: string }[])
@@ -144,7 +146,7 @@ export class MockDataService {
     const merged = new Set(existing);
     for (const id of candidates) merged.add(id);
 
-    this.favorites.replaceAll(Array.from(merged));
+    await this.favorites.replaceAll(Array.from(merged));
     return candidates.length;
   }
 
@@ -155,12 +157,12 @@ export class MockDataService {
    * If no mock catalog or customers exist, runs the corresponding seeder
    * first so the cross-references resolve.
    */
-  seedInvoices(): number {
-    this.clearMockInvoices();
+  async seedInvoices(): Promise<number> {
+    await this.clearMockInvoices();
 
     // Make sure dependencies are seeded.
-    if (!this.hasMockFamilies()) this.seedCatalog();
-    if (!this.hasMockCustomers()) this.seedCustomers();
+    if (!this.hasMockFamilies()) await this.seedCatalog();
+    if (!this.hasMockCustomers()) await this.seedCustomers();
 
     const mockCustomers = this.customers
       .customers()
@@ -174,17 +176,17 @@ export class MockDataService {
 
     const invoices = this.buildMockInvoices(resolved, mockCustomers);
     for (const inv of invoices) {
-      this.invoiceService.pushSaved(inv);
+      await this.invoiceService.pushSaved(inv);
     }
     return invoices.length;
   }
 
   /** Convenience: seed everything in dependency order. */
-  seedAll(): { families: number; customers: number; favorites: number; invoices: number } {
-    const families = this.seedCatalog();
-    const customers = this.seedCustomers();
-    const invoices = this.seedInvoices();
-    const favorites = this.seedFavorites();
+  async seedAll(): Promise<{ families: number; customers: number; favorites: number; invoices: number }> {
+    const families = await this.seedCatalog();
+    const customers = await this.seedCustomers();
+    const invoices = await this.seedInvoices();
+    const favorites = await this.seedFavorites();
     return { families, customers, favorites, invoices };
   }
 
@@ -196,12 +198,12 @@ export class MockDataService {
    * We delegate to each service's clearAll()/resetToDefault() so the live
    * signals stay in sync with the storage state.
    */
-  wipeAll(): void {
-    this.catalog.clearAll();
-    this.customers.clearAll();
-    this.favorites.clear();
-    this.clearAllSavedInvoices();
-    this.clearActiveInvoice();
+  async wipeAll(): Promise<void> {
+    await this.catalog.clearAll();
+    await this.customers.clearAll();
+    await this.favorites.clear();
+    await this.clearAllSavedInvoices();
+    await this.clearActiveInvoice();
   }
 
   // ---------------------------------------------------------------------------
@@ -485,44 +487,44 @@ export class MockDataService {
   // Mock-data cleanup helpers
   // ---------------------------------------------------------------------------
 
-  private clearMockFamilies(): void {
+  private async clearMockFamilies(): Promise<void> {
     const mockFamilyIds = this.catalog
       .families()
       .filter((f) => f.code.startsWith(MockDataService.MOCK_PREFIX))
       .map((f) => f.id);
     for (const id of mockFamilyIds) {
-      this.catalog.removeFamily(id);
+      await this.catalog.removeFamily(id);
     }
   }
 
-  private clearMockCustomers(): void {
+  private async clearMockCustomers(): Promise<void> {
     const mockCustomerIds = this.customers
       .customers()
       .filter((c) => c.name.startsWith(MockDataService.MOCK_CUSTOMER_PREFIX))
       .map((c) => c.id);
     for (const id of mockCustomerIds) {
-      this.customers.remove(id);
+      await this.customers.remove(id);
     }
   }
 
-  private clearMockInvoices(): void {
+  private async clearMockInvoices(): Promise<void> {
     const all = this.invoiceService.listSaved();
     const survivors = all.filter(
       (inv) => !inv.meta.invoiceNumber.startsWith(MockDataService.MOCK_INVOICE_PREFIX),
     );
     if (survivors.length !== all.length) {
-      this.invoiceService.replaceAllSaved(survivors);
+      await this.invoiceService.replaceAllSaved(survivors);
     }
   }
 
-  private clearAllSavedInvoices(): void {
-    this.invoiceService.replaceAllSaved([]);
+  private async clearAllSavedInvoices(): Promise<void> {
+    await this.invoiceService.replaceAllSaved([]);
   }
 
-  private clearActiveInvoice(): void {
+  private async clearActiveInvoice(): Promise<void> {
     // The active invoice always exists; clearing lines + resetting meta
     // is the closest thing to "wipe active" without breaking invariants.
-    this.invoiceService.clearLines();
+    await this.invoiceService.clearLines();
   }
 
   // ---------------------------------------------------------------------------

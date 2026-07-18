@@ -402,11 +402,14 @@
     "invoiceActionsDesc": "Remove every line from the active invoice. Saved invoices are not affected.",
     "clearInvoice": "Clear active invoice",
     "dangerZone": "Danger zone",
-    "dangerZoneDesc": "Wipe all local data (catalog, invoices, settings) and reload the app.",
-    "wipeAll": "Wipe all local data",
+    "dangerZoneDescLocal": "Wipe all local data (catalog, invoices, settings) from this device.",
+    "dangerZoneDescCloud": "Wipe all data from the cloud and this device. This will permanently clear your account.",
+    "wipeAllLocal": "Wipe all local data",
+    "wipeAllCloud": "Wipe all account & cloud data",
     "resetConfirm": "Clear the catalog? This cannot be undone.",
     "clearInvoiceConfirm": "Clear the current invoice?",
-    "wipeConfirm": "Wipe ALL local data? The app will reload with empty state.",
+    "wipeConfirmLocal": "Wipe ALL local data? The app will reload with an empty state.",
+    "wipeConfirmCloud": "Wipe ALL cloud and local data? This will permanently delete everything in your account and cannot be undone.",
     "rateUpdated": "Rate updated for {{code}}.",
     "defaultsSaved": "Invoice defaults saved.",
     "appUpdates": "App updates",
@@ -415,7 +418,11 @@
     "updateAvailableDesc": "Version {{version}} is available. Download and install to update.",
     "downloadAndInstall": "Download & install",
     "upToDate": "You're up to date!",
-    "checkNow": "Check now"
+    "checkNow": "Check now",
+    "account": "Account & cloud sync",
+    "signedIn": "Signed in",
+    "cloudSyncEnabled": "Cloud sync is on — your data is backed up to your account and available on all your devices.",
+    "cloudSyncDesc": "Sign in to sync your catalog, customers, and invoices across all your devices. Your data stays private to you."
   },
   "catalogMgmt": {
     "title": "Catalog Management",
@@ -644,5 +651,33 @@
     "toastWiped": "All app data wiped. Reload to see the empty state.",
     "toastSeedFailed": "Mock data seeding failed — check the console.",
     "toastWipeFailed": "Wipe failed — check the console."
+  },
+  "sync": {
+    "local": "Saved locally",
+    "synced": "Saved",
+    "syncing": "Saving…",
+    "offline": "Offline"
+  },
+  "auth": {
+    "account": "Account",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signingIn": "Signing in…",
+    "signInWithGoogle": "Sign in with Google"
+  },
+  "merge": {
+    "title": "Upload your local data?",
+    "summary": "You have local data on this device. Upload it to your account so you can access it from any device?",
+    "families": "{{count}} product families",
+    "families_1": "1 product family",
+    "customers": "{{count}} customers",
+    "customers_1": "1 customer",
+    "invoices": "{{count}} saved invoices",
+    "invoices_1": "1 saved invoice",
+    "favorites": "{{count}} favorites",
+    "favorites_1": "1 favorite",
+    "settings": "Settings & receipt layout",
+    "upload": "Upload to my account",
+    "discard": "Discard local data"
   }
 }

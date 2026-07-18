@@ -12,7 +12,9 @@
     "icons": "node scripts/generate-icons.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "postinstall": "node scripts/inject-env.mjs",
+    "deploy": "npm run build && firebase deploy --project playforge-hakanbaban53 --only hosting"
   },
   "private": true,
   "packageManager": "npm@11.13.0",
@@ -28,6 +30,7 @@
     "@ngx-translate/http-loader": "^16.0.1",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
+    "firebase": "^12.16.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "rxjs": "~7.8.0",

@@ -7,7 +7,8 @@ import {
   TaxLine,
   lineTotal,
 } from '../models/invoice.model';
-import { StorageService } from './storage.service';
+import { DataProvider, Collections } from './data-provider';
+import { LocalDataProvider } from './local-data-provider';
 import { InvoiceDefaultsService } from './invoice-defaults.service';
 
 /**
@@ -18,27 +19,42 @@ import { InvoiceDefaultsService } from './invoice-defaults.service';
  * one plus helpers to compute totals.
  *
  * All totals are derived from signals so the UI updates live without zone.js.
+ *
+ * Storage split:
+ *   - Active invoice draft: stored as a single doc under `invoice:active`
+ *     via `LocalDataProvider` — ALWAYS local, never synced to Firestore.
+ *     This is the work-in-progress, NOT a saved record. The user might be
+ *     mid-edit on their desktop and we don't want a half-finished invoice
+ *     appearing on their phone, nor do we want every keystroke (editing
+ *     the customer name, quantity, etc.) to trigger a Firestore write.
+ *
+ *   - Saved invoices: stored as a collection under `invoice:saved` via
+ *     the swapped `DataProvider`. These ARE synced across devices when
+ *     the user is signed in.
  */
 @Injectable({ providedIn: 'root' })
 export class InvoiceService {
-  private readonly storage = inject(StorageService);
+  private readonly data = inject(DataProvider);
+  private readonly localData = inject(LocalDataProvider);
   private readonly defaultsService = inject(InvoiceDefaultsService);
-  private readonly activeKey = 'invoice:active';
-  private readonly savedKey = 'invoice:saved';
 
-  private readonly _active = signal<Invoice>(this.loadActive());
-  readonly active = this._active.asReadonly();
+  /** Reactive view of the active invoice doc — ALWAYS local, never synced.
+   *  Uses LocalDataProvider directly so rapid edits (quantity changes,
+   *  customer name typing, etc.) don't trigger Firestore writes. */
+  private readonly activeDoc = this.localData.doc<Invoice>(Collections.invoiceActive);
+  /** Reactive view of the saved invoices collection — synced when logged in. */
+  readonly savedInvoices = this.data.collection<Invoice>(Collections.invoiceSaved);
 
-  private readonly _savedVersion = signal(0);
-  readonly savedVersion = this._savedVersion.asReadonly();
+  /** Active invoice — falls back to a fresh invoice if the doc is empty. */
+  readonly active = computed<Invoice>(() => this.activeDoc() ?? this.freshInvoice());
 
   readonly subtotal = computed(() =>
-    this._active().lines.reduce((sum, l) => sum + lineTotal(l), 0),
+    this.active().lines.reduce((sum, l) => sum + lineTotal(l), 0),
   );
 
   /** Active (enabled, non-zero) taxes on the current invoice. */
   readonly activeTaxes = computed(() =>
-    this._active().meta.taxes.filter((t) => t.enabled && t.value !== 0),
+    this.active().meta.taxes.filter((t) => t.enabled && t.value !== 0),
   );
 
   /** Total tax amount. */
@@ -52,57 +68,74 @@ export class InvoiceService {
   /** Grand total = subtotal + totalTax. */
   readonly grandTotal = computed(() => this.subtotal() + this.totalTax());
 
+  /** Saved-version signal — bumped for backward compat with code that
+   *  expects to track saved-list changes via a version counter. */
+  private readonly _savedVersion = signal(0);
+  readonly savedVersion = this._savedVersion.asReadonly();
+
+  constructor() {
+    // Bump savedVersion whenever the saved-list signal changes.
+    // This keeps backward compat with code that called `savedVersion()`
+    // to invalidate computed values.
+    computed(() => this.savedInvoices())(); // touch to track
+  }
+
   // ---------------------------------------------------------------------------
   // Mutations
   // ---------------------------------------------------------------------------
 
-  addLine(line: InvoiceLine): void {
-    this._active.update((inv) => ({
+  async addLine(line: InvoiceLine): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       lines: [...inv.lines, line],
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  updateLine(lineId: string, patch: Partial<InvoiceLine>): void {
-    this._active.update((inv) => ({
+  async updateLine(lineId: string, patch: Partial<InvoiceLine>): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       lines: inv.lines.map((l) => (l.id === lineId ? { ...l, ...patch } : l)),
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  removeLine(lineId: string): void {
-    this._active.update((inv) => ({
+  async removeLine(lineId: string): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       lines: inv.lines.filter((l) => l.id !== lineId),
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  updateLineQuantity(lineId: string, quantity: number): void {
+  async updateLineQuantity(lineId: string, quantity: number): Promise<void> {
     const qty = Math.max(1, Math.floor(quantity));
-    this.updateLine(lineId, { quantity: qty });
+    await this.updateLine(lineId, { quantity: qty });
   }
 
-  updateLineDiscount(lineId: string, discount: LineDiscount | undefined): void {
-    this.updateLine(lineId, { discount });
+  async updateLineDiscount(lineId: string, discount: LineDiscount | undefined): Promise<void> {
+    await this.updateLine(lineId, { discount });
   }
 
-  updateMeta(patch: Partial<InvoiceMeta>): void {
-    this._active.update((inv) => ({
+  async updateMeta(patch: Partial<InvoiceMeta>): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       meta: { ...inv.meta, ...patch },
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  updateTax(taxId: string, patch: Partial<TaxLine>): void {
-    this._active.update((inv) => ({
+  async updateTax(taxId: string, patch: Partial<TaxLine>): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       meta: {
         ...inv.meta,
@@ -111,12 +144,13 @@ export class InvoiceService {
         ),
       },
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  addTax(): void {
-    this._active.update((inv) => ({
+  async addTax(): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       meta: {
         ...inv.meta,
@@ -132,36 +166,35 @@ export class InvoiceService {
         ],
       },
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  removeTax(taxId: string): void {
-    this._active.update((inv) => ({
+  async removeTax(taxId: string): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       meta: {
         ...inv.meta,
         taxes: inv.meta.taxes.filter((t) => t.id !== taxId),
       },
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
-  clearLines(): void {
-    this._active.update((inv) => ({ ...inv, lines: [], updatedAt: Date.now() }));
-    this.persistActive();
+  async clearLines(): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = { ...inv, lines: [], updatedAt: Date.now() };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
   /** Save the current invoice into the saved list and start a fresh one. */
-  saveAndReset(): Invoice {
-    const saved = this._active();
-    const all = this.storage.read<Invoice[]>(this.savedKey, []);
-    all.push(saved);
-    this.storage.write(this.savedKey, all);
+  async saveAndReset(): Promise<Invoice> {
+    const saved = this.active();
+    await this.data.setRecord(Collections.invoiceSaved, saved);
+    await this.localData.setDoc(Collections.invoiceActive, this.freshInvoice());
     this._savedVersion.update((v) => v + 1);
-    this._active.set(this.freshInvoice());
-    this.persistActive();
     return saved;
   }
 
@@ -170,21 +203,19 @@ export class InvoiceService {
    * meta, and lines). Used by the "clone to editor" action on the customers
    * page. Does NOT mutate the saved list.
    */
-  loadSaved(invoice: Invoice): void {
-    this._active.set({
+  async loadSaved(invoice: Invoice): Promise<void> {
+    const clone: Invoice = {
       ...invoice,
       id: crypto.randomUUID(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    });
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, clone);
   }
 
   /** Delete a previously-saved invoice by id. */
-  deleteSaved(invoiceId: string): void {
-    const all = this.storage.read<Invoice[]>(this.savedKey, []);
-    const next = all.filter((inv) => inv.id !== invoiceId);
-    this.storage.write(this.savedKey, next);
+  async deleteSaved(invoiceId: string): Promise<void> {
+    await this.data.removeRecord(Collections.invoiceSaved, invoiceId);
     this._savedVersion.update((v) => v + 1);
   }
 
@@ -194,10 +225,8 @@ export class InvoiceService {
    * history; not part of the normal user flow (which goes through
    * `saveAndReset()`).
    */
-  pushSaved(invoice: Invoice): void {
-    const all = this.storage.read<Invoice[]>(this.savedKey, []);
-    all.push(invoice);
-    this.storage.write(this.savedKey, all);
+  async pushSaved(invoice: Invoice): Promise<void> {
+    await this.data.setRecord(Collections.invoiceSaved, invoice);
     this._savedVersion.update((v) => v + 1);
   }
 
@@ -206,15 +235,16 @@ export class InvoiceService {
    * seeder's wipe/refresh flow. Bumps `savedVersion` so reactive callers
    * re-evaluate. The active invoice is left untouched.
    */
-  replaceAllSaved(invoices: Invoice[]): void {
-    this.storage.write(this.savedKey, invoices);
+  async replaceAllSaved(invoices: Invoice[]): Promise<void> {
+    await this.data.replaceCollection(Collections.invoiceSaved, invoices);
     this._savedVersion.update((v) => v + 1);
   }
 
   /** Switch the active document between quote and invoice. Re-issues the
    *  document number with the appropriate prefix. */
-  setDocType(docType: 'quote' | 'invoice'): void {
-    this._active.update((inv) => ({
+  async setDocType(docType: 'quote' | 'invoice'): Promise<void> {
+    const inv = this.active();
+    const updated: Invoice = {
       ...inv,
       meta: {
         ...inv.meta,
@@ -222,15 +252,15 @@ export class InvoiceService {
         invoiceNumber: this.renumber(inv.meta.invoiceNumber, docType),
       },
       updatedAt: Date.now(),
-    }));
-    this.persistActive();
+    };
+    await this.localData.setDoc(Collections.invoiceActive, updated);
   }
 
   /** Convert the active quote into an invoice — convenience wrapper that
    *  flips `docType` and re-numbers in one call. */
-  convertToInvoice(): void {
-    if (this._active().meta.docType === 'invoice') return;
-    this.setDocType('invoice');
+  async convertToInvoice(): Promise<void> {
+    if (this.active().meta.docType === 'invoice') return;
+    await this.setDocType('invoice');
   }
 
   /** Replace the prefix of a document number (INV / QUO). */
@@ -245,15 +275,10 @@ export class InvoiceService {
     return `${prefix}-${currentNumber}`;
   }
 
-  /** List previously saved invoices (depends on `savedVersion` so reactive
-   *  callers re-evaluate when the list changes). */
+  /** List previously saved invoices. Reactive — returns the live signal
+   *  value, so callers wrapped in `computed()` re-run on save/delete. */
   listSaved(): Invoice[] {
-    // Read the version signal so computed() callers re-run on save/delete.
-    this._savedVersion();
-    const raw = this.storage.read<Invoice[]>(this.savedKey, []);
-    // Backward-compat: invoices saved before the `docType` field was added
-    // default to `'invoice'`. Same for the `customerId` field.
-    return raw.map((inv) => ({
+    return this.savedInvoices().map((inv) => ({
       ...inv,
       meta: {
         ...inv.meta,
@@ -266,25 +291,6 @@ export class InvoiceService {
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
-
-  private persistActive(): void {
-    this.storage.write(this.activeKey, this._active());
-  }
-
-  private loadActive(): Invoice {
-    const stored = this.storage.read<Invoice | null>(this.activeKey, null);
-    if (stored) {
-      // Backward-compat: pre-`docType` invoices default to 'invoice'.
-      return {
-        ...stored,
-        meta: {
-          ...stored.meta,
-          docType: stored.meta.docType ?? 'invoice',
-        },
-      };
-    }
-    return this.freshInvoice();
-  }
 
   private freshInvoice(docType: 'quote' | 'invoice' = 'invoice'): Invoice {
     const defaults = this.defaultsService.defaults();

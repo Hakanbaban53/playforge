@@ -1,10 +1,13 @@
-import { Component, computed, inject, signal, DestroyRef, Type } from '@angular/core';
+import { Component, computed, inject, signal, DestroyRef, Type, isDevMode } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { NgComponentOutlet } from '@angular/common';
 import { TranslatePipe } from '@ngx-translate/core';
 import { IconComponent } from './shared/components/icon.component';
 import { ToasterComponent } from './shared/components/toaster.component';
 import { UpdateBannerComponent } from './shared/components/update-banner.component';
+import { SyncIndicatorComponent } from './shared/components/sync-indicator.component';
+import { AuthWidgetComponent } from './shared/components/auth-widget.component';
+import { FirstLoginMergeComponent } from './shared/components/first-login-merge.component';
 import { InvoiceService } from './core/services/invoice.service';
 import { UpdateService } from './core/services/update.service';
 import { environment } from '../environments/environment';
@@ -34,7 +37,19 @@ interface NavItem {
  */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgComponentOutlet, IconComponent, ToasterComponent, TranslatePipe, UpdateBannerComponent],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    NgComponentOutlet,
+    IconComponent,
+    ToasterComponent,
+    TranslatePipe,
+    UpdateBannerComponent,
+    SyncIndicatorComponent,
+    AuthWidgetComponent,
+    FirstLoginMergeComponent,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -47,6 +62,13 @@ export class App {
 
   readonly sidebarCollapsed = signal(false);
   readonly mobileDrawerOpen = signal(false);
+  /**
+   * True for ~200ms after the mobile drawer starts closing. Keeps the
+   * backdrop rendered during its exit fade — without this, `@if` would
+   * remove the backdrop element the instant `mobileDrawerOpen()` flips
+   * to false, and the exit animation could never play.
+   */
+  readonly mobileBackdropLeaving = signal(false);
   readonly isMobile = signal(false);
 
   /**
@@ -86,11 +108,8 @@ export class App {
       window.removeEventListener('resize', this.onResizeBound);
     });
 
-    // Lazy-load dev tools only in non-production builds. The static
-    // `environment.production` check is replaced at build time (via
-    // fileReplacements), so the entire dynamic-import chain becomes
-    // dead code in production and gets tree-shaken.
-    if (!environment.production) {
+    // Lazy-load dev tools only in non-production builds.
+    if (isDevMode()) {
       void import('./shared/components/dev-tools.component')
         .then((m) => this._devToolsComponent.set(m.DevToolsComponent))
         .catch((err) => console.warn('[DevTools] failed to load:', err));
@@ -115,12 +134,16 @@ export class App {
   }
 
   closeMobileDrawer(): void {
-    if (this.isMobile()) {
-      this.mobileDrawerOpen.set(false);
-    }
+    if (!this.isMobile() || !this.mobileDrawerOpen()) return;
+    // Close the drawer immediately (sidebar starts sliding out via its
+    // existing transform transition), but keep the backdrop rendered for
+    // ~200ms so its exit fade can play.
+    this.mobileDrawerOpen.set(false);
+    this.mobileBackdropLeaving.set(true);
+    window.setTimeout(() => this.mobileBackdropLeaving.set(false), 200);
   }
 
   closeBackdrop(): void {
-    this.mobileDrawerOpen.set(false);
+    this.closeMobileDrawer();
   }
 }

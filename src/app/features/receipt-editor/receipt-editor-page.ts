@@ -58,6 +58,11 @@ export class ReceiptEditorPage {
   /** Track which element is currently selected for editing (its id). */
   readonly selectedId = signal<string | null>(null);
 
+  /** IDs of layout elements currently playing their exit animation. The
+   *  @for keeps them in the DOM until the animation finishes, then the
+   *  layout service actually removes them. */
+  readonly leavingIds = signal<ReadonlySet<string>>(new Set());
+
   /** Per-element upload-in-flight flag (keyed by element id). */
   readonly uploadingFor = signal<string | null>(null);
   readonly uploadError = signal<string | null>(null);
@@ -84,7 +89,7 @@ export class ReceiptEditorPage {
   onDrop(event: CdkDragDrop<LayoutElement[]>): void {
     const current = [...this.layout()];
     moveItemInArray(current, event.previousIndex, event.currentIndex);
-    this.layoutService.reorder(current);
+    void this.layoutService.reorder(current);
   }
 
   selectElement(id: string): void {
@@ -93,34 +98,43 @@ export class ReceiptEditorPage {
   }
 
   toggleVisibility(id: string): void {
-    this.layoutService.toggleVisibility(id);
+    void this.layoutService.toggleVisibility(id);
   }
 
   removeElement(id: string): void {
-    if (!this.layoutService.removeElement(id)) return;
+    if (!this.layoutService.isRemovableById(id)) return;
+    this.leavingIds.update((s) => new Set(s).add(id));
     if (this.selectedId() === id) this.selectedId.set(null);
+    window.setTimeout(() => {
+      void this.layoutService.removeElement(id);
+      this.leavingIds.update((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      });
+    }, 180);
   }
 
-  addElement(type: LayoutElementType): void {
-    const id = this.layoutService.addElement(type);
+  async addElement(type: LayoutElementType): Promise<void> {
+    const id = await this.layoutService.addElement(type);
     this.selectedId.set(id);
   }
 
   updateContent(id: string, event: Event): void {
     const value = (event.target as HTMLTextAreaElement | HTMLInputElement).value;
-    this.layoutService.updateElement(id, { content: value });
+    void this.layoutService.updateElement(id, { content: value });
   }
 
   updateStyle(id: string, key: keyof ReceiptStyles, event: Event): void {
     const target = event.target as HTMLInputElement | HTMLSelectElement;
     const value = target.value;
-    this.layoutService.updateStyle(id, key, value);
+    void this.layoutService.updateStyle(id, key, value);
   }
 
   /** Toggle a boolean-ish style (italic / underline) from a checkbox. */
   toggleStyle(id: string, key: 'fontStyle' | 'textDecoration', onValue: string, offValue: string, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
-    this.layoutService.updateStyle(id, key, checked ? onValue : offValue);
+    void this.layoutService.updateStyle(id, key, checked ? onValue : offValue);
   }
 
   /**
@@ -130,12 +144,12 @@ export class ReceiptEditorPage {
   bumpFontSize(el: LayoutElement, step: number): void {
     const current = this.parsePx(el.styles?.fontSize, el.type === 'header' ? 20 : 14);
     const next = Math.max(8, Math.min(96, current + step));
-    this.layoutService.updateStyle(el.id, 'fontSize', `${next}px`);
+    void this.layoutService.updateStyle(el.id, 'fontSize', `${next}px`);
   }
 
   async resetLayout(): Promise<void> {
     if (!await this.confirmSvc.confirm(this.i18n.t('common.confirm'), 'Reset layout')) return;
-    this.layoutService.resetToDefault();
+    await this.layoutService.resetToDefault();
     this.selectedId.set(null);
     this.toast.info('toast.layoutReset');
   }
@@ -204,7 +218,7 @@ export class ReceiptEditorPage {
       const urls = uploaded.map((u) => u.url);
       const existing = el.content?.trim() ?? '';
       const merged = existing ? `${existing}\n${urls.join('\n')}` : urls.join('\n');
-      this.layoutService.updateElement(el.id, { content: merged });
+      await this.layoutService.updateElement(el.id, { content: merged });
       this.toast.success('toast.imageUploaded');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Upload failed.';
@@ -221,7 +235,7 @@ export class ReceiptEditorPage {
   removeImage(el: LayoutElement, index: number): void {
     const sources = this.imageSources(el);
     sources.splice(index, 1);
-    this.layoutService.updateElement(el.id, { content: sources.join('\n') });
+    void this.layoutService.updateElement(el.id, { content: sources.join('\n') });
   }
 
   private parsePx(value: string | undefined, fallback: number): number {

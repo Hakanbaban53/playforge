@@ -100,6 +100,13 @@ export class CatalogManagementPage {
 
   readonly error = signal<string | null>(null);
 
+  /** IDs of variants/parts/families currently playing their exit animation.
+   *  Kept in the DOM until the animation completes, then the underlying
+   *  service actually removes the record. */
+  readonly leavingVariantIds = signal<ReadonlySet<string>>(new Set());
+  readonly leavingPartIds = signal<ReadonlySet<string>>(new Set());
+  readonly leavingFamilyIds = signal<ReadonlySet<string>>(new Set());
+
   // ---- Selection ----
 
   selectFamily(id: string): void {
@@ -137,7 +144,7 @@ export class CatalogManagementPage {
     this.error.set(null);
   }
 
-  saveFamily(): void {
+  async saveFamily(): Promise<void> {
     const name = this.fName().trim();
     const code = this.fCode().trim();
     if (!name) { this.error.set(this.i18n.t('catalogMgmt.nameRequired')); return; }
@@ -165,7 +172,7 @@ export class CatalogManagementPage {
       .filter(Boolean);
 
     if (this.editingId()) {
-      this.catalog.updateFamily(this.editingId()!, {
+      await this.catalog.updateFamily(this.editingId()!, {
         name, code, category: this.fCategory(),
         description: this.fDescription(),
         ageRange: this.fAgeRange() || undefined,
@@ -173,7 +180,7 @@ export class CatalogManagementPage {
         tags, images,
       });
     } else {
-      const created = this.catalog.addFamily({
+      const created = await this.catalog.addFamily({
         name, code, category: this.fCategory(),
         description: this.fDescription(),
         ageRange: this.fAgeRange() || undefined,
@@ -188,8 +195,16 @@ export class CatalogManagementPage {
 
   async deleteFamily(f: ProductFamily): Promise<void> {
     if (!await this.confirmSvc.confirm(this.i18n.t('catalogMgmt.deleteFamilyConfirm', { name: f.name }), 'Delete family')) return;
-    if (this.selectedFamilyId() === f.id) this.selectedFamilyId.set(null);
-    this.catalog.removeFamily(f.id);
+    this.leavingFamilyIds.update((s) => new Set(s).add(f.id));
+    window.setTimeout(async () => {
+      if (this.selectedFamilyId() === f.id) this.selectedFamilyId.set(null);
+      await this.catalog.removeFamily(f.id);
+      this.leavingFamilyIds.update((s) => {
+        const next = new Set(s);
+        next.delete(f.id);
+        return next;
+      });
+    }, 200);
   }
 
   // ---- Variant CRUD ----
@@ -219,7 +234,7 @@ export class CatalogManagementPage {
     this.error.set(null);
   }
 
-  saveVariant(): void {
+  async saveVariant(): Promise<void> {
     const familyId = this.selectedFamilyId();
     if (!familyId) return;
     const label = this.fVariantLabel().trim();
@@ -243,11 +258,11 @@ export class CatalogManagementPage {
     overrides.push({ key: 'price', value: this.fVariantPrice() });
 
     if (this.editingId()) {
-      this.catalog.updateVariant(this.editingId()!, {
+      await this.catalog.updateVariant(this.editingId()!, {
         label, sku, active: this.fVariantActive(), overrides,
       });
     } else {
-      this.catalog.addVariant({
+      await this.catalog.addVariant({
         familyId, label, sku, active: this.fVariantActive(), overrides,
       });
     }
@@ -256,7 +271,15 @@ export class CatalogManagementPage {
 
   async deleteVariant(v: ProductVariant): Promise<void> {
     if (!await this.confirmSvc.confirm(this.i18n.t('catalogMgmt.deleteVariantConfirm', { sku: v.sku }), 'Delete variant')) return;
-    this.catalog.removeVariant(v.id);
+    this.leavingVariantIds.update((s) => new Set(s).add(v.id));
+    window.setTimeout(async () => {
+      await this.catalog.removeVariant(v.id);
+      this.leavingVariantIds.update((s) => {
+        const next = new Set(s);
+        next.delete(v.id);
+        return next;
+      });
+    }, 200);
   }
 
   // ---- Part CRUD ----
@@ -286,7 +309,7 @@ export class CatalogManagementPage {
     this.error.set(null);
   }
 
-  savePart(): void {
+  async savePart(): Promise<void> {
     const familyId = this.selectedFamilyId();
     if (!familyId) return;
     const fam = this.familyById().get(familyId);
@@ -317,7 +340,7 @@ export class CatalogManagementPage {
       ? fam.availableParts.map((p) => (p.id === this.editingId() ? part : p))
       : [...fam.availableParts, part];
 
-    this.catalog.updateFamily(familyId, { availableParts: newParts });
+    await this.catalog.updateFamily(familyId, { availableParts: newParts });
     this.cancelDraft();
   }
 
@@ -327,8 +350,19 @@ export class CatalogManagementPage {
     const fam = this.familyById().get(familyId);
     if (!fam) return;
     if (!await this.confirmSvc.confirm(this.i18n.t('catalogMgmt.deletePartConfirm', { name: p.name }), 'Delete part')) return;
-    const newParts = fam.availableParts.filter((x) => x.id !== p.id);
-    this.catalog.updateFamily(familyId, { availableParts: newParts });
+    this.leavingPartIds.update((s) => new Set(s).add(p.id));
+    window.setTimeout(async () => {
+      const current = this.familyById().get(familyId);
+      if (current) {
+        const newParts = current.availableParts.filter((x) => x.id !== p.id);
+        await this.catalog.updateFamily(familyId, { availableParts: newParts });
+      }
+      this.leavingPartIds.update((s) => {
+        const next = new Set(s);
+        next.delete(p.id);
+        return next;
+      });
+    }, 200);
   }
 
   // ---- Helpers ----

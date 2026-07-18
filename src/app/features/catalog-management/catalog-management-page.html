@@ -34,6 +34,7 @@
               type="button"
               class="family-card"
               [class.family-card--active]="selectedFamilyId() === fam.id"
+              [class.family-card--leaving]="leavingFamilyIds().has(fam.id)"
               (click)="selectFamily(fam.id)"
             >
               <div class="family-card__code mono">{{ fam.code }}</div>
@@ -168,7 +169,7 @@
           } @else {
             <div class="variants-list">
               @for (v of variants(); track v.id) {
-                <div class="variant-row">
+                <div class="variant-row" [class.variant-row--leaving]="leavingVariantIds().has(v.id)">
                   <div>
                     <div class="variant-row__label">{{ v.label }}</div>
                     <div class="variant-row__sku mono">{{ v.sku }}</div>
@@ -211,7 +212,7 @@
           } @else {
             <div class="parts-list">
               @for (p of fam.availableParts; track p.id) {
-                <div class="part-row">
+                <div class="part-row" [class.part-row--leaving]="leavingPartIds().has(p.id)">
                   <div>
                     <div class="part-row__name">
                       {{ p.name }}

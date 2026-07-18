@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-07-18
+
+### Added
+
+- **Settings & Catalog Import/Export**:
+  - **Global Settings Management**: Added `settings` page to view, import, and export the application's global settings.
+  - **JSON Import/Export**: Added full CRUD functionality for global settings and catalog data using JSON files.
+  - **Template Download**: Implemented a "Download Customer Template" feature to provide users with a pre-structure for customer data import.
+
+- **MockDatas**: Added mock datas for testing on development environment.
+
 ## [0.1.2] - 2026-07-07
 
 ### Added

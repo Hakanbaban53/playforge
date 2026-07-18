@@ -38,25 +38,53 @@ export class ConfirmService {
       dialog.setAttribute('aria-describedby', 'app-confirm-message');
 
       dialog.innerHTML = `
-        <form method="dialog" class="app-confirm__form">
+        <form class="app-confirm__form">
           <h2 id="app-confirm-title" class="app-confirm__title">${this.escapeHtml(title)}</h2>
           <p id="app-confirm-message" class="app-confirm__message">${this.escapeHtml(message)}</p>
           <div class="app-confirm__actions">
-            <button type="submit" value="cancel" class="app-confirm__btn app-confirm__btn--cancel">
+            <button type="button" value="cancel" class="app-confirm__btn app-confirm__btn--cancel">
               ${this.escapeHtml(this.cancelLabel())}
             </button>
-            <button type="submit" value="confirm" class="app-confirm__btn app-confirm__btn--confirm" autofocus>
+            <button type="button" value="confirm" class="app-confirm__btn app-confirm__btn--confirm" autofocus>
               ${this.escapeHtml(this.confirmLabel())}
             </button>
           </div>
         </form>
       `;
 
+      let resolved = false;
+      const finish = (value: boolean): void => {
+        if (resolved) return;
+        resolved = true;
+        // Play the exit animation, then actually close after it completes.
+        dialog.classList.add('app-confirm--leaving');
+        window.setTimeout(() => {
+          if (dialog.open) dialog.close();
+          dialog.remove();
+          resolve(value);
+        }, 180);
+      };
+
+      // Button clicks — read the value attr to know which button was hit.
+      dialog.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'BUTTON') {
+          e.preventDefault();
+          const value = (target as HTMLButtonElement).value === 'confirm';
+          finish(value);
+        }
+      });
+
+      // ESC key — the browser fires the 'close' event with empty returnValue.
+      // Resolve with false (cancel) and clean up. No exit animation because
+      // the browser already closed the dialog synchronously.
       dialog.addEventListener('close', () => {
-        const confirmed = dialog.returnValue === 'confirm';
-        dialog.remove();
-        resolve(confirmed);
-      }, { once: true });
+        if (!resolved) {
+          resolved = true;
+          dialog.remove();
+          resolve(false);
+        }
+      });
 
       document.body.appendChild(dialog);
       dialog.showModal();
@@ -98,11 +126,21 @@ export class ConfirmService {
         color: var(--text-base);
         box-shadow: var(--shadow-lg);
         font-family: var(--font-sans);
-        animation: app-confirm-enter var(--motion-base) both;
+        animation: app-confirm-enter var(--motion-base) var(--ease-decelerate) both;
+        transition: opacity var(--motion-base) var(--ease-accelerate),
+                    transform var(--motion-base) var(--ease-accelerate);
       }
       .app-confirm::backdrop {
         background: rgba(15, 23, 32, 0.45);
         backdrop-filter: blur(2px);
+        animation: app-confirm-backdrop-enter var(--motion-base) both;
+        transition: opacity var(--motion-base) var(--ease-accelerate);
+      }
+      .app-confirm--leaving {
+        animation: app-confirm-exit var(--motion-base) var(--ease-accelerate) both;
+      }
+      .app-confirm--leaving::backdrop {
+        animation: app-confirm-backdrop-exit var(--motion-base) var(--ease-accelerate) both;
       }
       .app-confirm__form {
         padding: var(--space-6);
@@ -140,15 +178,15 @@ export class ConfirmService {
         border: 1px solid transparent;
         cursor: pointer;
         transition: background var(--motion-fast), border-color var(--motion-fast),
-          transform var(--motion-fast);
+          transform var(--motion-fast), color var(--motion-fast);
         white-space: nowrap;
       }
       .app-confirm__btn:not(:disabled):active {
         transform: translateY(1px);
       }
       .app-confirm__btn:focus-visible {
-        outline: none;
-        box-shadow: 0 0 0 3px var(--brand-focus-ring);
+        outline: 2px solid var(--brand-500);
+        outline-offset: 2px;
       }
       .app-confirm__btn--cancel {
         background: var(--surface-0);
@@ -171,8 +209,23 @@ export class ConfirmService {
         from { opacity: 0; transform: scale(0.96); }
         to   { opacity: 1; transform: scale(1); }
       }
+      @keyframes app-confirm-exit {
+        from { opacity: 1; transform: scale(1); }
+        to   { opacity: 0; transform: scale(0.96); }
+      }
+      @keyframes app-confirm-backdrop-enter {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes app-confirm-backdrop-exit {
+        from { opacity: 1; }
+        to   { opacity: 0; }
+      }
       @media (prefers-reduced-motion: reduce) {
-        .app-confirm { animation: none; }
+        .app-confirm,
+        .app-confirm::backdrop,
+        .app-confirm--leaving,
+        .app-confirm--leaving::backdrop { animation: none; }
       }
     `;
     document.head.appendChild(style);

@@ -49,6 +49,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Enter animation runs whenever a new card is created by the @for. */
+  animation: fade-in var(--motion-base) both;
+
+  &--leaving {
+    animation: list-item-exit var(--motion-base) var(--ease-accelerate) both;
+  }
 }
 
 .customer-card__head {

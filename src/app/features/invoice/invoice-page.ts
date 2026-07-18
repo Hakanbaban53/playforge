@@ -51,6 +51,12 @@ export class InvoicePage {
   readonly pdfError = signal<string | null>(null);
   readonly lastPageCount = signal<number | null>(null);
 
+  /** IDs of line items / tax items currently playing their exit animation.
+   *  The @for keeps them in the DOM until the animation finishes, then the
+   *  underlying service actually removes them. */
+  readonly leavingLineIds = signal<ReadonlySet<string>>(new Set());
+  readonly leavingTaxIds = signal<ReadonlySet<string>>(new Set());
+
   /** Per-line total helper. */
   lineTotal = lineTotal;
 
@@ -71,26 +77,26 @@ export class InvoicePage {
   updateMeta(event: Event, key: keyof InvoiceMeta): void {
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
     if (key === 'docType') {
-      this.invoiceService.setDocType(value as 'quote' | 'invoice');
+      void this.invoiceService.setDocType(value as 'quote' | 'invoice');
       return;
     }
-    this.invoiceService.updateMeta({ [key]: value });
+    void this.invoiceService.updateMeta({ [key]: value });
   }
 
   updateLineQty(lineId: string, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.invoiceService.updateLineQuantity(lineId, value);
+    void this.invoiceService.updateLineQuantity(lineId, value);
   }
 
   updateDiscountType(lineId: string, event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
     if (value === 'none') {
-      this.invoiceService.updateLineDiscount(lineId, undefined);
+      void this.invoiceService.updateLineDiscount(lineId, undefined);
       return;
     }
     const line = this.active().lines.find((l) => l.id === lineId);
     const existing = line?.discount;
-    this.invoiceService.updateLineDiscount(lineId, {
+    void this.invoiceService.updateLineDiscount(lineId, {
       type: value as 'percent' | 'fixed',
       value: existing?.value ?? 0,
     });
@@ -101,56 +107,72 @@ export class InvoicePage {
     if (!line?.discount) return;
     const raw = Number((event.target as HTMLInputElement).value);
     const value = Number.isFinite(raw) && raw >= 0 ? raw : 0;
-    this.invoiceService.updateLineDiscount(lineId, {
+    void this.invoiceService.updateLineDiscount(lineId, {
       type: line.discount.type,
       value,
     });
   }
 
   removeLine(lineId: string): void {
-    this.invoiceService.removeLine(lineId);
+    this.leavingLineIds.update((s) => new Set(s).add(lineId));
+    window.setTimeout(() => {
+      void this.invoiceService.removeLine(lineId);
+      this.leavingLineIds.update((s) => {
+        const next = new Set(s);
+        next.delete(lineId);
+        return next;
+      });
+    }, 180);
     this.toast.info('toast.lineRemoved');
   }
 
   clearAll(): void {
-    this.invoiceService.clearLines();
+    void this.invoiceService.clearLines();
     this.toast.info('toast.linesCleared');
   }
 
   toggleTax(taxId: string, enabled: boolean): void {
-    this.invoiceService.updateTax(taxId, { enabled });
+    void this.invoiceService.updateTax(taxId, { enabled });
   }
 
   updateTaxValue(taxId: string, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.invoiceService.updateTax(taxId, { value: Number.isFinite(value) ? value : 0 });
+    void this.invoiceService.updateTax(taxId, { value: Number.isFinite(value) ? value : 0 });
   }
 
   updateTaxName(taxId: string, event: Event): void {
     const value = (event.target as HTMLInputElement).value;
-    this.invoiceService.updateTax(taxId, { name: value });
+    void this.invoiceService.updateTax(taxId, { name: value });
   }
 
   updateTaxType(taxId: string, event: Event): void {
     const value = (event.target as HTMLSelectElement).value as 'percent' | 'fixed';
-    this.invoiceService.updateTax(taxId, { type: value });
+    void this.invoiceService.updateTax(taxId, { type: value });
   }
 
   addTax(): void {
-    this.invoiceService.addTax();
+    void this.invoiceService.addTax();
   }
 
   removeTax(taxId: string): void {
-    this.invoiceService.removeTax(taxId);
+    this.leavingTaxIds.update((s) => new Set(s).add(taxId));
+    window.setTimeout(() => {
+      void this.invoiceService.removeTax(taxId);
+      this.leavingTaxIds.update((s) => {
+        const next = new Set(s);
+        next.delete(taxId);
+        return next;
+      });
+    }, 180);
   }
 
-  save(): void {
-    this.invoiceService.saveAndReset();
+  async save(): Promise<void> {
+    await this.invoiceService.saveAndReset();
     this.toast.success('toast.invoiceSaved');
   }
 
-  convertToInvoice(): void {
-    this.invoiceService.convertToInvoice();
+  async convertToInvoice(): Promise<void> {
+    await this.invoiceService.convertToInvoice();
     this.toast.success('toast.convertedToInvoice');
   }
 

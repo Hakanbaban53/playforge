@@ -71,7 +71,7 @@
       } @else {
         <div class="customers-list">
           @for (c of customers(); track c.id) {
-            <article class="surface-card customer-card">
+            <article class="surface-card customer-card" [class.customer-card--leaving]="leavingCustomerIds().has(c.id)">
               <div class="customer-card__head">
                 <div class="customer-card__avatar">
                   <app-icon name="person" [size]="18" />
@@ -124,7 +124,7 @@
       } @else {
         <div class="invoices-list">
           @for (inv of savedInvoices(); track inv.id) {
-            <article class="surface-card invoice-card">
+            <article class="surface-card invoice-card" [class.invoice-card--leaving]="leavingInvoiceIds().has(inv.id)">
               <div class="invoice-card__head">
                 <span class="invoice-card__type" [class.invoice-card__type--quote]="inv.meta.docType === 'quote'">
                   {{ (inv.meta.docType === 'quote' ? 'quote.quote' : 'quote.invoice') | translate }}

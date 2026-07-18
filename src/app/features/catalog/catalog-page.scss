@@ -22,7 +22,7 @@
 
     &:focus-within {
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 4px var(--brand-focus-ring);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
 
     input {
@@ -150,7 +150,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: transform var(--motion-base), box-shadow var(--motion-base);
+  /* Hover lifts the card and intensifies the shadow; the inner media
+     image also scales slightly (handled below). No transform here —
+     transform is declared on the parent only if we want a lift, but
+     the shadow lift alone reads cleaner and avoids layout-affecting
+     transforms during theme transitions. */
+  transition: box-shadow var(--motion-base), background-color var(--motion-base);
 
   &:hover {
     box-shadow: var(--shadow-md);

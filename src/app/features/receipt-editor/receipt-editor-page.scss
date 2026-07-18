@@ -87,6 +87,12 @@
   box-shadow: 0 0 0 1px transparent;
   cursor: pointer;
   transition: background var(--motion-fast), box-shadow var(--motion-fast);
+  animation: fade-in var(--motion-fast) both;
+
+  &--leaving {
+    animation: list-item-exit var(--motion-base) var(--ease-accelerate) both;
+    pointer-events: none;
+  }
 
   &:hover {
     background: var(--surface-100);
@@ -216,6 +222,7 @@
     color: var(--text-base);
     background: var(--surface-0);
     font-family: inherit;
+    transition: box-shadow var(--motion-fast), background-color var(--motion-fast);
 
     &:focus {
       outline: none;

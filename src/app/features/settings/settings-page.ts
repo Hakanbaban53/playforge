@@ -8,6 +8,10 @@ import { I18nService, AppLanguage } from '../../core/services/i18n.service';
 import { CurrencyService, CurrencyCode } from '../../core/services/currency.service';
 import { UpdateService } from '../../core/services/update.service';
 import { ConfirmService } from '../../core/services/confirm.service';
+import { AuthService } from '../../core/services/auth.service';
+import { CustomersService } from '../../core/services/customers.service';
+import { FavoritesService } from '../../core/services/favorites.service';
+import { ReceiptLayoutService } from '../../core/services/receipt-layout.service';
 import { PaperSize } from '../../core/models/invoice.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
@@ -27,11 +31,15 @@ export class SettingsPage {
   private readonly catalog = inject(CatalogService);
   private readonly invoice = inject(InvoiceService);
   private readonly invoiceDefaults = inject(InvoiceDefaultsService);
+  private readonly customersSvc = inject(CustomersService);
+  private readonly favoritesSvc = inject(FavoritesService);
+  private readonly receiptLayoutSvc = inject(ReceiptLayoutService);
   private readonly themeService = inject(ThemeService);
   private readonly i18n = inject(I18nService);
   private readonly currencyService = inject(CurrencyService);
   private readonly updateSvc = inject(UpdateService);
   private readonly confirmSvc = inject(ConfirmService);
+  readonly auth = inject(AuthService);
 
   readonly families = this.catalog.families;
   readonly variants = this.catalog.variants;
@@ -69,7 +77,7 @@ export class SettingsPage {
   updateRate(code: CurrencyCode, event: Event): void {
     const v = Number((event.target as HTMLInputElement).value);
     if (Number.isFinite(v)) {
-      this.currencyService.setRate(code, v);
+      void this.currencyService.setRate(code, v);
     }
   }
 
@@ -78,41 +86,66 @@ export class SettingsPage {
 
   setDefaultPaper(event: Event): void {
     const v = (event.target as HTMLSelectElement).value as PaperSize;
-    this.invoiceDefaults.update({ paperSize: v });
+    void this.invoiceDefaults.update({ paperSize: v });
   }
 
   setDefaultCurrency(event: Event): void {
     const v = (event.target as HTMLSelectElement).value;
-    this.invoiceDefaults.update({ currency: v });
+    void this.invoiceDefaults.update({ currency: v });
   }
 
   setDefaultVat(event: Event): void {
     const v = Number((event.target as HTMLInputElement).value);
     if (Number.isFinite(v)) {
-      this.invoiceDefaults.update({ vatPercent: v });
+      void this.invoiceDefaults.update({ vatPercent: v });
     }
   }
 
   // Catalog actions
   async clearCatalog(): Promise<void> {
     if (!await this.confirmSvc.confirm(this.i18n.t('settings.resetConfirm'), 'Reset catalog')) return;
-    this.catalog.clearAll();
+    await this.catalog.clearAll();
   }
 
   async clearInvoice(): Promise<void> {
     if (!await this.confirmSvc.confirm(this.i18n.t('settings.clearInvoiceConfirm'), 'Clear invoice')) return;
-    this.invoice.clearLines();
+    await this.invoice.clearLines();
   }
 
   async wipeAll(): Promise<void> {
-    if (!await this.confirmSvc.confirm(this.i18n.t('settings.wipeConfirm'), 'Wipe all data')) return;
-    const keys: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith('pgpos:')) keys.push(k);
+    const isCloud = this.auth.isAuthenticated();
+    const confirmMsg = isCloud
+      ? this.i18n.t('settings.wipeConfirmCloud')
+      : this.i18n.t('settings.wipeConfirmLocal');
+
+    if (!await this.confirmSvc.confirm(confirmMsg, 'Wipe all data')) return;
+
+    // Wipe ALL data through the service layer so it works regardless of
+    // which DataProvider is active (local or Firestore). Each service's
+    // clear method goes through the DataProvider, which writes to
+    // localStorage (logged out) or Firestore (logged in).
+    await this.catalog.clearAll();
+    await this.customersSvc.clearAll();
+    await this.favoritesSvc.clear();
+    await this.invoice.replaceAllSaved([]);
+    await this.invoice.clearLines();
+    await this.receiptLayoutSvc.resetToDefault();
+
+    // Also clear localStorage keys for local-only data that doesn't go
+    // through a service (e.g. the active invoice draft, which is always
+    // local). This catches any stragglers.
+    if (typeof localStorage !== 'undefined') {
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith('pgpos:')) keys.push(k);
+      }
+      keys.forEach((k) => localStorage.removeItem(k));
     }
-    keys.forEach((k) => localStorage.removeItem(k));
+
+    // Clear IndexedDB image storage (uploaded images).
     await this.wipeIndexedDB();
+
     location.reload();
   }
 

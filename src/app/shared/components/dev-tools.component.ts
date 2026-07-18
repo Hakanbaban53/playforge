@@ -1,6 +1,5 @@
-import { Component, computed, inject, signal, effect, HostBinding } from '@angular/core';
+import { Component, computed, inject, signal, effect, HostBinding, isDevMode } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
-import { environment } from '../../../environments/environment';
 import { MockDataService } from '../../core/services/mock-data.service';
 import { ToastService } from '../../core/services/toast.service';
 import { CatalogService } from '../../core/services/catalog.service';
@@ -64,9 +63,11 @@ import { IconComponent } from './icon.component';
       }
 
       <!-- Expanded: panel -->
-      @if (open()) {
+      @if (open() || leaving()) {
         <div
-          class="dev-panel anim-scale-in"
+          class="dev-panel"
+          [class.dev-panel--enter]="open() && !leaving()"
+          [class.dev-panel--leaving]="leaving()"
           role="dialog"
           [attr.aria-label]="'dev.title' | translate"
         >
@@ -209,7 +210,7 @@ import { IconComponent } from './icon.component';
         height: 6px;
         border-radius: 50%;
         background: var(--brand-500);
-        animation: pulse-soft 1.8s ease-in-out infinite;
+        animation: var(--motion-pulse);
       }
     }
 
@@ -227,6 +228,18 @@ import { IconComponent } from './icon.component';
       flex-direction: column;
       gap: var(--space-3);
       transform-origin: bottom right;
+    }
+
+    /* Enter + exit are declared as separate classes (not the global
+       anim-scale-in utility) so we can pair them with the leaving
+       signal without the global class clobbering the exit animation.
+       Same curve as scale-in / scale-out — decelerate in, accelerate out. */
+    .dev-panel--enter {
+      animation: scale-in var(--motion-base) var(--ease-decelerate) both;
+    }
+
+    .dev-panel--leaving {
+      animation: scale-out var(--motion-base) var(--ease-accelerate) both;
     }
 
     .dev-panel__head {
@@ -415,10 +428,14 @@ export class DevToolsComponent {
   private readonly favorites = inject(FavoritesService);
 
   /** True in production builds — the entire template no-ops. */
-  readonly isProduction = environment.production;
+  readonly isProduction = !isDevMode();
 
   /** Panel open/closed state. Persisted to localStorage so it survives reloads. */
   readonly open = signal(this.loadOpenState());
+
+  /** True for ~200ms after the user closes the panel — keeps the panel
+   *  in the DOM so the exit animation can play before `@if` removes it. */
+  readonly leaving = signal(false);
 
   /** True while a seed/wipe operation is in flight (disables buttons). */
   readonly busy = signal(false);
@@ -455,17 +472,27 @@ export class DevToolsComponent {
   readonly hostPointerEvents = 'none';
 
   toggle(): void {
-    this.open.update((v) => !v);
+    if (this.open()) {
+      // Two-phase close: mark leaving so the CSS exit animation plays,
+      // then actually close after the animation duration.
+      this.leaving.set(true);
+      window.setTimeout(() => {
+        this.open.set(false);
+        this.leaving.set(false);
+      }, 200);
+    } else {
+      this.open.set(true);
+    }
   }
 
   // ---------------------------------------------------------------------------
   // Seed actions — each surfaces a toast with the count.
   // ---------------------------------------------------------------------------
 
-  seedCatalog(): void {
+  async seedCatalog(): Promise<void> {
     this.busy.set(true);
     try {
-      const n = this.mock.seedCatalog();
+      const n = await this.mock.seedCatalog();
       this.toast.success('dev.toastCatalogSeeded', { count: n });
     } catch (err) {
       console.error('[DevTools] seedCatalog failed:', err);
@@ -475,10 +502,10 @@ export class DevToolsComponent {
     }
   }
 
-  seedCustomers(): void {
+  async seedCustomers(): Promise<void> {
     this.busy.set(true);
     try {
-      const n = this.mock.seedCustomers();
+      const n = await this.mock.seedCustomers();
       this.toast.success('dev.toastCustomersSeeded', { count: n });
     } catch (err) {
       console.error('[DevTools] seedCustomers failed:', err);
@@ -488,10 +515,10 @@ export class DevToolsComponent {
     }
   }
 
-  seedFavorites(): void {
+  async seedFavorites(): Promise<void> {
     this.busy.set(true);
     try {
-      const n = this.mock.seedFavorites();
+      const n = await this.mock.seedFavorites();
       this.toast.success('dev.toastFavoritesSeeded', { count: n });
     } catch (err) {
       console.error('[DevTools] seedFavorites failed:', err);
@@ -501,10 +528,10 @@ export class DevToolsComponent {
     }
   }
 
-  seedInvoices(): void {
+  async seedInvoices(): Promise<void> {
     this.busy.set(true);
     try {
-      const n = this.mock.seedInvoices();
+      const n = await this.mock.seedInvoices();
       this.toast.success('dev.toastInvoicesSeeded', { count: n });
     } catch (err) {
       console.error('[DevTools] seedInvoices failed:', err);
@@ -514,10 +541,10 @@ export class DevToolsComponent {
     }
   }
 
-  seedAll(): void {
+  async seedAll(): Promise<void> {
     this.busy.set(true);
     try {
-      const result = this.mock.seedAll();
+      const result = await this.mock.seedAll();
       this.toast.success('dev.toastAllSeeded', {
         families: result.families,
         customers: result.customers,
@@ -532,10 +559,10 @@ export class DevToolsComponent {
     }
   }
 
-  wipeAll(): void {
+  async wipeAll(): Promise<void> {
     this.busy.set(true);
     try {
-      this.mock.wipeAll();
+      await this.mock.wipeAll();
       this.toast.warn('dev.toastWiped');
     } catch (err) {
       console.error('[DevTools] wipeAll failed:', err);

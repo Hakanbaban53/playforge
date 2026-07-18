@@ -55,6 +55,7 @@
             class="layout-item" role="button" tabindex="0"
             [class.layout-item--selected]="selectedId() === el.id"
             [class.layout-item--hidden]="!el.visible"
+            [class.layout-item--leaving]="leavingIds().has(el.id)"
             cdkDrag
             (click)="selectElement(el.id)"
           >

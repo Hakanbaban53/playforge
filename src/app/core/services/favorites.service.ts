@@ -1,59 +1,59 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
-import { StorageService } from './storage.service';
+import { Injectable, inject, computed } from '@angular/core';
+import { DataProvider, Collections } from './data-provider';
 
 /**
  * Per-user catalog favorites.
  *
- * Stored as a flat list of variant IDs under `pgpos:catalog:favorites`.
+ * Stored as a single doc (array of variant IDs) under `catalog:favorites`.
  * The catalog page reads `isFavorite(id)` and `onlyFavorites()` to filter
  * the grid; the star button on each card toggles via `toggle(id)`.
  *
- * Backed by localStorage so favorites survive reloads; no server needed.
+ * When the user is signed in, favorites sync to Firestore; when signed
+ * out, they live in localStorage. The DataProvider handles the swap.
+ *
+ * Note: we use the single-doc API rather than a collection because
+ * favorites is conceptually one set per user, not a list of records.
+ * Internally we represent it as `{ ids: string[] }`.
  */
+interface FavoritesDoc {
+  ids: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class FavoritesService {
-  private readonly storage = inject(StorageService);
-  private readonly storageKey = 'catalog:favorites';
+  private readonly data = inject(DataProvider);
 
-  private readonly _ids = signal<Set<string>>(this.load());
-  /** Readonly set of favorited variant IDs. */
-  readonly ids = this._ids.asReadonly();
+  /** Reactive set of favorited variant IDs. */
+  readonly favoritesDoc = this.data.doc<FavoritesDoc>(Collections.favorites);
+
+  readonly ids = computed<Set<string>>(() => {
+    const doc = this.favoritesDoc();
+    return new Set(doc?.ids ?? []);
+  });
+
+  readonly count = computed(() => this.ids().size);
 
   isFavorite(variantId: string): boolean {
-    return this._ids().has(variantId);
+    return this.ids().has(variantId);
   }
 
   /** Returns the new state. */
-  toggle(variantId: string): boolean {
-    const next = new Set(this._ids());
-    if (next.has(variantId)) next.delete(variantId);
-    else next.add(variantId);
-    this._ids.set(next);
-    this.persist();
-    return next.has(variantId);
+  async toggle(variantId: string): Promise<boolean> {
+    const current = new Set(this.ids());
+    if (current.has(variantId)) current.delete(variantId);
+    else current.add(variantId);
+    await this.data.setDoc<FavoritesDoc>(Collections.favorites, { ids: Array.from(current) });
+    return current.has(variantId);
   }
 
   /** Replace the entire favorites list (used by settings import). */
-  replaceAll(ids: string[]): void {
-    const next = new Set(ids.filter((id) => typeof id === 'string' && id.length > 0));
-    this._ids.set(next);
-    this.persist();
+  async replaceAll(ids: string[]): Promise<void> {
+    const clean = ids.filter((id) => typeof id === 'string' && id.length > 0);
+    await this.data.setDoc<FavoritesDoc>(Collections.favorites, { ids: clean });
   }
 
   /** Remove all favorites. */
-  clear(): void {
-    this._ids.set(new Set());
-    this.persist();
-  }
-
-  readonly count = computed(() => this._ids().size);
-
-  private load(): Set<string> {
-    const arr = this.storage.read<string[]>(this.storageKey, []);
-    return new Set(arr);
-  }
-
-  private persist(): void {
-    this.storage.write(this.storageKey, Array.from(this._ids()));
+  async clear(): Promise<void> {
+    await this.data.setDoc<FavoritesDoc>(Collections.favorites, { ids: [] });
   }
 }

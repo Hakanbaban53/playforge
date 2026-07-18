@@ -66,7 +66,12 @@ export class ThemeService {
         : mode;
     this.resolved.set(resolved);
     if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', resolved);
+      const html = document.documentElement;
+      html.classList.add('theme-transitioning');
+      html.setAttribute('data-theme', resolved);
+      if (typeof window !== 'undefined') {
+        window.setTimeout(() => html.classList.remove('theme-transitioning'), 280);
+      }
     }
   }
 

@@ -150,7 +150,7 @@ export class ConfiguratorPage {
       primaryImage?.url,
       undefined,
     );
-    this.invoice.addLine(line);
+    void this.invoice.addLine(line);
     this.toast.success('toast.addedToInvoice');
   }
 

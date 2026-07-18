@@ -43,7 +43,8 @@ type ButtonSize = 'sm' | 'md' | 'lg';
         font-family: inherit;
         cursor: pointer;
         transition: background var(--motion-fast), border-color var(--motion-fast),
-          transform var(--motion-fast), box-shadow var(--motion-fast);
+          transform var(--motion-fast), box-shadow var(--motion-fast),
+          color var(--motion-fast);
         white-space: nowrap;
         user-select: none;
       }
@@ -53,6 +54,14 @@ type ButtonSize = 'sm' | 'md' | 'lg';
       }
       .btn:not(:disabled):active {
         transform: translateY(1px);
+      }
+      /* Focus ring via outline (not box-shadow) so it doesn't conflict
+         with the hover box-shadow on primary/accent/danger variants.
+         outline-offset keeps the ring 2px off the button edge so it
+         reads on both light and dark backgrounds. */
+      .btn:focus-visible {
+        outline: 2px solid var(--brand-500);
+        outline-offset: 2px;
       }
 
       .btn--sm {
@@ -119,7 +128,7 @@ type ButtonSize = 'sm' | 'md' | 'lg';
         border-radius: 50%;
         border: 2px solid currentColor;
         border-top-color: transparent;
-        animation: spin 0.7s linear infinite;
+        animation: var(--motion-spin);
       }
     `,
   ],

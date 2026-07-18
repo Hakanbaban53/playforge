@@ -72,16 +72,22 @@
     padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
-    transition: background var(--motion-fast), color var(--motion-fast);
+    transition: background var(--motion-fast), color var(--motion-fast),
+                box-shadow var(--motion-fast);
 
     &:hover {
       color: var(--text-strong);
     }
-  }
 
-  .seg-btn--active {
-    background: var(--brand-500);
-    color: var(--text-on-brand);
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
+    }
+
+    &.seg-btn--active {
+      background: var(--brand-500);
+      color: var(--text-on-brand);
+    }
   }
 }
 
@@ -130,6 +136,7 @@
   font-family: var(--font-mono);
   background: var(--surface-0);
   color: var(--text-base);
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 
   &:focus {
     outline: none;
@@ -205,7 +212,7 @@
   margin-bottom: 12px;
 
   app-icon {
-    animation: spin 1s linear infinite;
+    animation: var(--motion-spin);
   }
 
   &--ok {
@@ -250,7 +257,7 @@
     height: 100%;
     background: var(--brand-500);
     border-radius: 3px;
-    transition: width 0.2s ease;
+    transition: width var(--motion-fast);
   }
 }
 

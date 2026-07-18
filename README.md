@@ -84,6 +84,15 @@
 - All pages optimized for touch (≤768px breakpoints)
 - Shell-level `overflow-x: hidden` so any in-page horizontal overflow stays on the page (no leaky shell scrollbars)
 
+### ☁️ Optional Cloud Sync (Firebase)
+- **Sign in with Google** to sync your catalog, customers, invoices, and settings across all your devices
+- **Local-first** — the app works fully offline; cloud is opt-in
+- **Real-time sync** via Firestore `onSnapshot` listeners with offline persistence
+- **Per-user isolation** enforced by Firestore security rules (no cross-user data access)
+- **First-login merge** — prompts to upload your existing local data when you sign in for the first time
+- **Sync indicator** in the sidebar footer shows current state (saved / saving / offline / local-only)
+- See [`docs/CLOUD_SYNC.md`](docs/CLOUD_SYNC.md) for setup instructions
+
 ## Tech Stack
 
 | Layer | Technology |

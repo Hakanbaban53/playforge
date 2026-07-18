@@ -60,6 +60,49 @@
       </div>
     </div>
 
+    <!-- Account: cloud sync + sign-in -->
+    @if (auth.cloudEnabled) {
+      <div class="surface-card card">
+        <h3 class="card__title">{{ 'settings.account' | translate }}</h3>
+
+        @if (auth.user(); as u) {
+          <div class="setting-row">
+            <div class="setting-row__meta">
+              <div class="setting-row__label">{{ u.displayName ?? u.email }}</div>
+              <div class="muted small">
+                @if (u.email) {
+                  {{ u.email }}
+                } @else {
+                  {{ 'settings.signedIn' | translate }}
+                }
+              </div>
+            </div>
+            <app-button variant="secondary" size="sm" (click)="auth.signOut()">
+              <app-icon name="logout" [size]="14" />
+              {{ 'auth.signOut' | translate }}
+            </app-button>
+          </div>
+          <p class="muted small">{{ 'settings.cloudSyncEnabled' | translate }}</p>
+        } @else {
+          <p class="muted small">{{ 'settings.cloudSyncDesc' | translate }}</p>
+          <app-button
+            variant="primary"
+            size="md"
+            (click)="auth.signInWithGoogle()"
+            [disabled]="auth.signingIn()"
+          >
+            @if (auth.signingIn()) {
+              <app-icon name="progress_activity" [size]="14" [class.btn__spinner-icon]="true" />
+              {{ 'auth.signingIn' | translate }}
+            } @else {
+              <span class="btn__google-g" aria-hidden="true">G</span>
+              {{ 'auth.signInWithGoogle' | translate }}
+            }
+          </app-button>
+        }
+      </div>
+    }
+
     <!-- App updates (Tauri only) -->
     @if (isTauri()) {
       <div class="surface-card card">
@@ -208,10 +251,12 @@
     <!-- Danger zone -->
     <div class="surface-card card card--danger">
       <h3 class="card__title card__title--danger">{{ 'settings.dangerZone' | translate }}</h3>
-      <p class="muted small">{{ 'settings.dangerZoneDesc' | translate }}</p>
+      <p class="muted small">
+        {{ (auth.isAuthenticated() ? 'settings.dangerZoneDescCloud' : 'settings.dangerZoneDescLocal') | translate }}
+      </p>
       <app-button variant="danger" size="md" (click)="wipeAll()">
         <app-icon name="delete" [size]="14" />
-        {{ 'settings.wipeAll' | translate }}
+        {{ (auth.isAuthenticated() ? 'settings.wipeAllCloud' : 'settings.wipeAllLocal') | translate }}
       </app-button>
     </div>
   </div>

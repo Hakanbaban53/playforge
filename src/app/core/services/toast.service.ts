@@ -33,7 +33,7 @@ export interface ToastEntry {
 }
 
 const DEFAULT_TTL_MS = 3800;
-const EXIT_ANIM_MS = 280;
+const EXIT_ANIM_MS = 200;
 
 @Injectable({ providedIn: 'root' })
 export class ToastService {

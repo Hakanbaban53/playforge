@@ -101,10 +101,10 @@ export class CatalogPage {
     this.onlyFavorites.update((v) => !v);
   }
 
-  toggleFavorite(variantId: string, event: Event): void {
+  async toggleFavorite(variantId: string, event: Event): Promise<void> {
     event.stopPropagation();
     event.preventDefault();
-    const nowFav = this.favorites.toggle(variantId);
+    const nowFav = await this.favorites.toggle(variantId);
     this.toast.success(nowFav ? 'toast.favoriteAdded' : 'toast.favoriteRemoved');
   }
 
@@ -121,7 +121,7 @@ export class CatalogPage {
     const resolved = this.catalog.resolve(variantId);
     if (!resolved) return;
     const line = lineFromResolved(resolved, 1);
-    this.invoice.addLine(line);
+    void this.invoice.addLine(line);
     this.toast.success('toast.addedToInvoice');
   }
 

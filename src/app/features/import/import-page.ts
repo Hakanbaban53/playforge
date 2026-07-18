@@ -309,14 +309,14 @@ export class ImportPage {
     }
   }
 
-  applyImport(): void {
+  async applyImport(): Promise<void> {
     if (this.importTarget() === 'settings') {
       const r = this.settingsResult();
       if (!r?.bundle) return;
       const sel = this.settingsSectionSelected();
       const sections = r.validSections.filter((k) => sel[k] !== false);
       if (sections.length === 0) return;
-      const result = this.appSettings.apply(r.bundle, sections);
+      const result = await this.appSettings.apply(r.bundle, sections);
       this.settingsApplied.set(result);
       return;
     }
@@ -325,7 +325,7 @@ export class ImportPage {
       if (!p) return;
       const selectedDrafts = p.rows.filter((r) => r.selected).map((r) => r.draft as ImportedCustomerDraft);
       if (selectedDrafts.length === 0) return;
-      const summary = this.excel.applyCustomerDrafts(selectedDrafts, this.importMode());
+      const summary = await this.excel.applyCustomerDrafts(selectedDrafts, this.importMode());
       this.customerApplied.set(summary);
       return;
     }
@@ -333,7 +333,7 @@ export class ImportPage {
     if (!p) return;
     const selectedDrafts = p.rows.filter((r) => r.selected).map((r) => r.draft as ImportedProductDraft);
     if (selectedDrafts.length === 0) return;
-    const summary = this.excel.applyDrafts(selectedDrafts, this.importMode());
+    const summary = await this.excel.applyDrafts(selectedDrafts, this.importMode());
     this.applied.set(summary);
     this.stats.set({
       families: this.catalog.families().length,

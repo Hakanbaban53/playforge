@@ -402,11 +402,14 @@
     "invoiceActionsDesc": "Aktif faturadaki tüm kalemleri kaldırın. Kaydedilmiş faturalar etkilenmez.",
     "clearInvoice": "Aktif faturayı temizle",
     "dangerZone": "Tehlikeli bölge",
-    "dangerZoneDesc": "Tüm yerel verileri (katalog, faturalar, ayarlar) silin ve uygulamayı yeniden yükleyin.",
-    "wipeAll": "Tüm yerel veriyi sil",
+    "dangerZoneDescLocal": "Bu cihazdaki tüm yerel verileri (katalog, faturalar, ayarlar) silin.",
+    "dangerZoneDescCloud": "Buluttaki ve bu cihazdaki tüm verileri silin. Bu işlem hesabınızı tamamen sıfırlayacaktır.",
+    "wipeAllLocal": "Tüm yerel verileri sil",
+    "wipeAllCloud": "Tüm hesap ve bulut verilerini sil",
     "resetConfirm": "Katalog temizlensin mi? Bu işlem geri alınamaz.",
     "clearInvoiceConfirm": "Mevcut fatura temizlensin mi?",
-    "wipeConfirm": "TÜM yerel veriler silinsin mi? Uygulama boş durumla yeniden yüklenecek.",
+    "wipeConfirmLocal": "TÜM yerel veriler silinsin mi? Uygulama boş durumla yeniden yüklenecek.",
+    "wipeConfirmCloud": "Buluttaki ve yereldeki TÜM veriler silinsin mi? Bu işlem hesabınızdaki her şeyi kalıcı olarak silecektir ve geri alınamaz.",
     "rateUpdated": "{{code}} için kur güncellendi.",
     "defaultsSaved": "Fatura varsayılanları kaydedildi.",
     "appUpdates": "Uygulama güncellemeleri",
@@ -415,7 +418,11 @@
     "updateAvailableDesc": "{{version}} sürümü mevcut. Güncellemek için indir ve yükle.",
     "downloadAndInstall": "İndir ve yükle",
     "upToDate": "Güncelsiniz!",
-    "checkNow": "Şimdi kontrol et"
+    "checkNow": "Şimdi kontrol et",
+    "account": "Hesap ve bulut senkronizasyonu",
+    "signedIn": "Giriş yapıldı",
+    "cloudSyncEnabled": "Bulut senkronizasyonu açık — verileriniz hesabınıza yedeklenir ve tüm cihazlarınızdan erişilebilir.",
+    "cloudSyncDesc": "Kataloğunuzu, müşterilerinizi ve faturalarınızı tüm cihazlarınızda senkronize etmek için giriş yapın. Verileriniz size özeldir."
   },
   "catalogMgmt": {
     "title": "Katalog Yönetimi",
@@ -644,5 +651,33 @@
     "toastWiped": "Tüm uygulama verisi silindi. Boş durumu görmek için sayfayı yenileyin.",
     "toastSeedFailed": "Sahte veri ekleme başarısız — konsolu kontrol edin.",
     "toastWipeFailed": "Silme başarısız — konsolu kontrol edin."
+  },
+  "sync": {
+    "local": "Yerel olarak kaydedildi",
+    "synced": "Kaydedildi",
+    "syncing": "Kaydediliyor…",
+    "offline": "Çevrimdışı"
+  },
+  "auth": {
+    "account": "Hesap",
+    "signIn": "Giriş yap",
+    "signOut": "Çıkış yap",
+    "signingIn": "Giriş yapılıyor…",
+    "signInWithGoogle": "Google ile giriş yap"
+  },
+  "merge": {
+    "title": "Yerel verilerinizi yükleyin?",
+    "summary": "Bu cihazda yerel veriniz var. Hesabınıza yükleyin ki her cihazdan erişebilesiniz?",
+    "families": "{{count}} ürün ailesi",
+    "families_1": "1 ürün ailesi",
+    "customers": "{{count}} müşteri",
+    "customers_1": "1 müşteri",
+    "invoices": "{{count}} kayıtlı fatura",
+    "invoices_1": "1 kayıtlı fatura",
+    "favorites": "{{count}} favori",
+    "favorites_1": "1 favori",
+    "settings": "Ayarlar ve fiş düzeni",
+    "upload": "Hesabıma yükle",
+    "discard": "Yerel verileri sil"
   }
 }

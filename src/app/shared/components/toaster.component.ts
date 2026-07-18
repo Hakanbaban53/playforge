@@ -78,10 +78,10 @@ import { IconComponent } from './icon.component';
       box-shadow: 0 0 0 1px var(--surface-200);
       font-size: 13px;
       color: var(--text-base);
-      animation: toast-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      animation: toast-enter var(--motion-base) var(--ease-spring) both;
 
       &--leaving {
-        animation: toast-exit 280ms cubic-bezier(0.4, 0, 0.6, 1) both;
+        animation: toast-exit var(--motion-base) var(--ease-accelerate) both;
       }
 
       &__icon {

@@ -47,6 +47,12 @@ export class CustomersPage {
   readonly editingId = signal<string | null>(null);
   readonly isCreating = signal(false);
 
+  /** IDs of customers/saved-invoices currently playing their exit animation.
+   *  Kept in the DOM (via the `@if` render condition) until the animation
+   *  completes, then the underlying service actually removes the record. */
+  readonly leavingCustomerIds = signal<ReadonlySet<string>>(new Set());
+  readonly leavingInvoiceIds = signal<ReadonlySet<string>>(new Set());
+
   readonly fName = signal('');
   readonly fTaxId = signal('');
   readonly fEmail = signal('');
@@ -95,7 +101,7 @@ export class CustomersPage {
     this.isCreating.set(false);
   }
 
-  save(): void {
+  async save(): Promise<void> {
     const name = this.fName().trim();
     if (!name) {
       this.toast.warn('catalogMgmt.nameRequired');
@@ -111,9 +117,9 @@ export class CustomersPage {
     };
     const id = this.editingId();
     if (id) {
-      this.customersSvc.update(id, input);
+      await this.customersSvc.update(id, input);
     } else {
-      this.customersSvc.add(input);
+      await this.customersSvc.add(input);
     }
     this.toast.success('toast.customerSaved');
     this.cancelEdit();
@@ -122,13 +128,23 @@ export class CustomersPage {
   async remove(c: Customer): Promise<void> {
     const msg = this.i18n.t('customers.deleteConfirm', { name: c.name });
     if (!await this.confirmSvc.confirm(msg, this.i18n.t('common.delete'))) return;
-    this.customersSvc.remove(c.id);
+    // Two-phase removal: mark as leaving so the CSS exit animation plays,
+    // then actually remove from the service after the animation duration.
+    this.leavingCustomerIds.update((s) => new Set(s).add(c.id));
+    window.setTimeout(async () => {
+      await this.customersSvc.remove(c.id);
+      this.leavingCustomerIds.update((s) => {
+        const next = new Set(s);
+        next.delete(c.id);
+        return next;
+      });
+    }, 200);
     this.toast.info('toast.customerDeleted');
   }
 
   /** Copy customer fields onto the active invoice meta. */
-  useForInvoice(c: Customer): void {
-    this.invoiceSvc.updateMeta({
+  async useForInvoice(c: Customer): Promise<void> {
+    await this.invoiceSvc.updateMeta({
       customerId: c.id,
       customerName: c.name,
       customerEmail: c.email,
@@ -142,8 +158,8 @@ export class CustomersPage {
   // ---- Saved-invoice actions ----
 
   /** Clone a saved invoice back into the active editor. */
-  cloneToEditor(inv: Invoice): void {
-    this.invoiceSvc.loadSaved(inv);
+  async cloneToEditor(inv: Invoice): Promise<void> {
+    await this.invoiceSvc.loadSaved(inv);
     this.toast.success('toast.saved');
     void this.router.navigate(['/invoice']);
   }
@@ -151,7 +167,15 @@ export class CustomersPage {
   async deleteInvoice(inv: Invoice): Promise<void> {
     const msg = this.i18n.t('customers.deleteInvoiceConfirm', { number: inv.meta.invoiceNumber });
     if (!await this.confirmSvc.confirm(msg, this.i18n.t('common.delete'))) return;
-    this.invoiceSvc.deleteSaved(inv.id);
+    this.leavingInvoiceIds.update((s) => new Set(s).add(inv.id));
+    window.setTimeout(async () => {
+      await this.invoiceSvc.deleteSaved(inv.id);
+      this.leavingInvoiceIds.update((s) => {
+        const next = new Set(s);
+        next.delete(inv.id);
+        return next;
+      });
+    }, 200);
     this.toast.info('toast.deleted');
   }
 

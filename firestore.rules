@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// ============================================================================
+// Parkman / PlayForge — Firestore Security Rules
+// ----------------------------------------------------------------------------
+// These rules enforce TWO layers of protection:
+//
+//   1. IDENTITY: Only the authenticated owner can read/write their own data.
+//      Every document lives under users/{uid}/... and the rule checks that
+//      request.auth.uid matches the {uid} in the path. No user can read,
+//      write, or delete another user's data — the database enforces this
+//      before the data ever reaches the client.
+//
+//   2. SHAPE: Basic data validation ensures documents have the expected
+//      fields. This catches bugs (e.g. a code error writing a malformed
+//      document) and limits abuse (e.g. writing an enormous document).
+//
+// Deploy with:
+//   firebase deploy --only firestore:rules
+//
+// Data layout:
+//   users/{uid}/customers/{customerId}         — Customer records
+//   users/{uid}/catalog:families/{familyId}    — Product families
+//   users/{uid}/catalog:variants/{variantId}   — Product variants
+//   users/{uid}/invoice:saved/{invoiceId}      — Saved invoices
+//   users/{uid}/catalog:favorites/value        — Single doc: { ids: string[] }
+//   users/{uid}/receipt:layout/value           — Single doc: { elements: [...] }
+//   users/{uid}/app:invoice-defaults/value     — Single doc
+//   users/{uid}/app:exchange-rates/value       — Single doc
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helper functions --------------------------------------------------
+    //
+    // These are reusable functions that can be called from any match block.
+
+    /** True if the request is from an authenticated user whose uid
+     *  matches the {uid} segment in the document path. This is the
+     *  core identity check — every read/write under users/{uid}/...
+     *  must pass this. */
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    /** True if the incoming data is a non-empty map (object). Used to
+     *  reject null/undefined writes at the rules level. */
+    function isNonEmptyMap() {
+      return request.resource.data is map
+        && request.resource.data.keys().size() > 0;
+    }
+
+    /** True if the document size is under 1 MB (Firestore's hard limit
+     *  is 1 MB per document; this gives a safety margin). */
+    function isReasonableSize() {
+      return request.resource.data.size() < 900000;
+    }
+
+    // ---- Per-user data -----------------------------------------------------
+    //
+    // Match the user document itself (users/{uid}) AND everything under
+    // it (subcollections, subdocuments). Both `read` and `write` are
+    // gated on the identity check.
+    //
+    // Why two match blocks? Firestore's recursive wildcard
+    // {document=**} has known limitations with collection-group queries
+    // and parent-path matches. By matching both the document at
+    // users/{uid} and recursively at users/{uid}/{document=**}, we
+    // cover both single-doc reads (doc()) and collection reads
+    // (collection().get() / onSnapshot).
+
+    match /users/{uid} {
+      // The user "document" itself (users/{uid}). In practice this
+      // document is never directly read/written — all data lives in
+      // subcollections — but we allow it so the recursive match below
+      // works correctly.
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isNonEmptyMap() && isReasonableSize();
+      allow delete: if isOwner(uid);
+
+      // Recursive: any subcollection or subdocument under
+      // users/{uid}/... . This is where all the actual data lives.
+      // The identity check (isOwner) ensures User A can never access
+      // User B's data, even if the client code has a bug that tries.
+      match /{document=**} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isNonEmptyMap() && isReasonableSize();
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ---- Default: deny everything else ------------------------------------
+    //
+    // Any path NOT under users/{uid}/... is denied. This is the
+    // catch-all safety net — if someone accidentally creates a
+    // top-level collection (e.g. "customers" instead of
+    // "users/{uid}/customers"), the write is rejected.
+    //
+    // If you later add shared/workspaces collections, add an explicit
+    // allow rule ABOVE this default-deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

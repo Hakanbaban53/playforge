@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { UpdateService } from '../../core/services/update.service';
 import { IconComponent } from './icon.component';
@@ -7,22 +7,27 @@ import { ButtonComponent } from './button.component';
 /**
  * Floating update banner component.
  * Displays when a new version of the app is available.
- * Animates in from the bottom right.
+ * Animates in from the bottom right; plays a slide-down + fade on dismiss.
  */
 @Component({
   selector: 'app-update-banner',
   standalone: true,
   imports: [IconComponent, ButtonComponent, TranslatePipe],
   template: `
-    @if (updateService.updateAvailable(); as update) {
-      <div class="update-banner" role="alert" aria-live="assertive">
+    @if (updateService.updateAvailable() || leaving()) {
+      <div
+        class="update-banner"
+        [class.update-banner--leaving]="leaving()"
+        role="alert"
+        aria-live="assertive"
+      >
         <div class="update-banner__header">
           <app-icon name="system_update_alt" class="update-banner__icon" [size]="20" />
           <div class="update-banner__title-wrapper">
             <h4 class="update-banner__title">{{ 'settings.appUpdates' | translate }}</h4>
-            <p class="update-banner__subtitle">{{ 'settings.updateAvailableDesc' | translate: { version: update.version } }}</p>
+            <p class="update-banner__subtitle">{{ 'settings.updateAvailableDesc' | translate: { version: updateService.updateAvailable()?.version } }}</p>
           </div>
-          <button type="button" class="update-banner__close" (click)="updateService.dismiss()" [attr.aria-label]="'common.close' | translate">
+          <button type="button" class="update-banner__close" (click)="dismiss()" [attr.aria-label]="'common.close' | translate">
             <app-icon name="close" [size]="16" />
           </button>
         </div>
@@ -36,7 +41,7 @@ import { ButtonComponent } from './button.component';
           </div>
         } @else {
           <div class="update-banner__actions">
-            <button type="button" class="update-banner__dismiss-btn" (click)="updateService.dismiss()">
+            <button type="button" class="update-banner__dismiss-btn" (click)="dismiss()">
               {{ 'common.dismiss' | translate }}
             </button>
             <app-button variant="primary" size="sm" (click)="updateService.downloadAndInstall()">
@@ -63,11 +68,16 @@ import { ButtonComponent } from './button.component';
       display: flex;
       flex-direction: column;
       gap: 12px;
-      animation: update-slide-up var(--motion-base) cubic-bezier(0.16, 1, 0.3, 1);
+      animation: update-slide-up var(--motion-base) var(--ease-out-quint) both;
+      transform-origin: bottom right;
 
       @supports (backdrop-filter: blur(8px)) {
         background: rgba(var(--surface-0-rgb, 255, 255, 255), 0.85);
         backdrop-filter: blur(8px);
+      }
+
+      &--leaving {
+        animation: update-slide-down var(--motion-base) var(--ease-accelerate) both;
       }
 
       &__header {
@@ -121,6 +131,11 @@ import { ButtonComponent } from './button.component';
           background: var(--surface-100);
           color: var(--text-strong);
         }
+
+        &:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 2px var(--brand-focus-ring);
+        }
       }
 
       &__actions {
@@ -145,6 +160,11 @@ import { ButtonComponent } from './button.component';
           background: var(--surface-100);
           color: var(--text-strong);
         }
+
+        &:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 2px var(--brand-focus-ring);
+        }
       }
 
       &__progress-wrapper {
@@ -166,7 +186,7 @@ import { ButtonComponent } from './button.component';
         height: 100%;
         background: var(--brand-500);
         border-radius: 999px;
-        transition: width var(--motion-fast) ease-out;
+        transition: width var(--motion-fast);
       }
 
       &__progress-text {
@@ -188,8 +208,32 @@ import { ButtonComponent } from './button.component';
         opacity: 1;
       }
     }
+
+    @keyframes update-slide-down {
+      from {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+      to {
+        transform: translateY(24px) scale(0.96);
+        opacity: 0;
+      }
+    }
   `],
 })
 export class UpdateBannerComponent {
   readonly updateService = inject(UpdateService);
+
+  /** True for ~200ms after the user dismisses the banner — keeps it in
+   *  the DOM so the exit animation can play before the @if removes it. */
+  readonly leaving = signal(false);
+
+  dismiss(): void {
+    if (this.leaving()) return;
+    this.leaving.set(true);
+    window.setTimeout(() => {
+      this.updateService.dismiss();
+      this.leaving.set(false);
+    }, 200);
+  }
 }

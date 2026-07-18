@@ -77,7 +77,11 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 90;
-  animation: fade-in var(--motion-fast);
+  animation: fade-in var(--motion-fast) both;
+
+  &--leaving {
+    animation: fade-out var(--motion-base) var(--ease-accelerate) both;
+  }
 }
 
 /* ============================ Sidebar ============================ */
@@ -119,6 +123,16 @@
     padding-top: 16px;
     margin-top: 12px;
     flex-shrink: 0;
+    animation: fade-in var(--motion-fast) both;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    &--collapsed {
+      padding-top: 12px;
+      margin-top: 8px;
+      align-items: center;
+    }
   }
 
   /* Mobile: fixed drawer that slides in from the left */
@@ -194,6 +208,10 @@
   flex-direction: column;
   line-height: 1.15;
   overflow: hidden;
+  /* Fade in when the sidebar expands / mobile drawer opens. The @if in
+     app.html removes the element on collapse, so there's no exit
+     animation — the grid/drawer transition carries the visual instead. */
+  animation: fade-in var(--motion-fast) both;
 }
 
 .brand-name {
@@ -259,6 +277,7 @@
     line-height: 1.15;
     flex: 1;
     overflow: hidden;
+    animation: fade-in var(--motion-fast) both;
   }
 
   &__title {

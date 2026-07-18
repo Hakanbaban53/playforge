@@ -54,6 +54,11 @@
   text-align: left;
   cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast);
+  animation: fade-in var(--motion-fast) both;
+
+  &--leaving {
+    animation: list-item-exit var(--motion-base) var(--ease-accelerate) both;
+  }
 
   &:hover {
     background: var(--surface-100);
@@ -192,6 +197,11 @@
   background: var(--surface-50);
   box-shadow: 0 0 0 1px var(--surface-200);
   border-radius: var(--radius-sm);
+  animation: fade-in var(--motion-base) both;
+
+  &--leaving {
+    animation: list-item-exit var(--motion-base) var(--ease-accelerate) both;
+  }
 }
 
 .variant-row {

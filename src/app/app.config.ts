@@ -17,6 +17,9 @@ import { FileStorageAdapter } from './core/services/file-storage.adapter';
 import { BrowserFileStorageAdapter } from './core/services/browser-file-storage.adapter';
 import { TauriFileStorageAdapter } from './core/services/tauri-file-storage.adapter';
 import { I18nService } from './core/services/i18n.service';
+import { AuthService } from './core/services/auth.service';
+import { DataProvider } from './core/services/data-provider';
+import { DataProviderService } from './core/services/data-provider-service';
 
 export function httpLoaderFactory(http: HttpClient): TranslateLoader {
   return new TranslateHttpLoader(http, 'assets/i18n/', '.json');
@@ -41,6 +44,9 @@ export const appConfig: ApplicationConfig = {
     }),
     provideAppInitializer(() => inject(I18nService).init()),
     provideAppInitializer(() => { inject(ThemeService); }),
+    // Initialize Firebase + AuthService on startup. If Firebase is
+    // disabled in environment.ts, these are no-ops.
+    provideAppInitializer(() => { inject(AuthService); }),
     {
       provide: FileStorageAdapter,
       useFactory: () => {
@@ -50,5 +56,8 @@ export const appConfig: ApplicationConfig = {
         return new BrowserFileStorageAdapter();
       },
     },
+    // DataProvider is implemented by DataProviderService, which proxies
+    // to LocalDataProvider or FirestoreDataProvider based on auth state.
+    { provide: DataProvider, useExisting: DataProviderService },
   ],
 };

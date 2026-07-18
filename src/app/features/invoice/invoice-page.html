@@ -167,7 +167,7 @@
         } @else {
           <div class="lines">
             @for (line of active().lines; track line.id) {
-              <article class="line-item">
+              <article class="line-item" [class.line-item--leaving]="leavingLineIds().has(line.id)">
                 <div class="line-item__top">
                   <div class="line-item__media">
                     @if (line.imageUrl) {
@@ -283,7 +283,7 @@
         } @else {
           <div class="taxes">
             @for (tax of active().meta.taxes; track tax.id) {
-              <div class="tax-item">
+              <div class="tax-item" [class.tax-item--leaving]="leavingTaxIds().has(tax.id)">
                 <label class="toggle">
                   <input
                     type="checkbox"

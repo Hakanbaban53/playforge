@@ -83,6 +83,26 @@
   --motion-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --motion-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* Easing curves — use with bare durations when a non-standard curve is
+     needed. The --motion-* tokens above already pair standard duration
+     with --ease-standard; reach for these only when an entrance/exit
+     needs a different feel.
+       standard   — default for most things (matches --motion-*)
+       decelerate — entering screen (toasts, banners, dialogs)
+       accelerate — leaving screen (exits)
+       spring     — bouncy entrances (dev panel, suggestions)
+       out-quint  — gentle decelerate for large surfaces (modals) */
+  --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring:     cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-quint:  cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Continuous iteration tokens — single source of truth for spinners and
+     pulses so individual components stop hard-coding their own durations. */
+  --motion-spin: 900ms linear infinite;
+  --motion-pulse: 1.8s ease-in-out infinite;
+
   --app-max-width: 1480px;
   --app-max-width-narrow: 1100px;
 
@@ -279,6 +299,16 @@ a:hover { text-decoration: underline; }
 
 button { font-family: inherit; }
 
+/* Global transition on form controls so focus rings and hover states
+   animate on/off consistently, even for inputs that bypass .field
+   (rate-input, notes-input, ctrl__input, tax-item__*, e-field *).
+   The .field input/select/textarea rule below adds the same transition
+   at higher specificity — both are safe; this is the catch-all. */
+input, select, textarea {
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast),
+              background-color var(--motion-fast), color var(--motion-fast);
+}
+
 /* ---- Utility primitives (used app-wide) ---- */
 .surface-card {
   background: var(--surface-0);
@@ -316,9 +346,33 @@ button { font-family: inherit; }
   to { transform: rotate(360deg); }
 }
 
+/* ---- Exit animations (paired with the enter animations above) ---- */
+@keyframes fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes slide-out-right {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(24px); }
+}
+@keyframes scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
+}
+
+/* List item removal — fade + slight shrink. Pairs with a `leaving` flag
+   on the host component: the item stays in the DOM for the duration of
+   this animation, then is removed by the signal update. */
+@keyframes list-item-exit {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
+}
+
 .anim-fade-in   { animation: fade-in var(--motion-base) both; }
 .anim-slide-in  { animation: slide-in-right var(--motion-base) both; }
 .anim-scale-in  { animation: scale-in var(--motion-base) both; }
+.anim-fade-out  { animation: fade-out var(--motion-base) var(--ease-accelerate) both; }
+.anim-spin      { animation: var(--motion-spin); }
 
 /* Staggered list items */
 .stagger > * { animation: fade-in var(--motion-base) both; }
@@ -330,6 +384,31 @@ button { font-family: inherit; }
 .stagger > *:nth-child(6) { animation-delay: 180ms; }
 .stagger > *:nth-child(7) { animation-delay: 210ms; }
 .stagger > *:nth-child(8) { animation-delay: 240ms; }
+
+/* Theme switch cross-fade — when the html element has .theme-transitioning,
+   every element gets a brief color/bg/border transition so the dark/light
+   swap cross-fades instead of flashing. ThemeService adds the class
+   immediately before data-theme changes and removes it ~280ms later.
+
+   The `!important` is intentional: it overrides per-component transitions
+   for the brief transition window only. Reduced-motion users are
+   unaffected — the @media block below clamps transition-duration to
+   ~0ms, and it's declared after this rule so it wins.
+
+   Excluded on purpose: transform, width, height, opacity — animating
+   those during a theme switch would cause layout jank. Gradients
+   (sidebar bg, brand-mark) can't transition via background-color and
+   will still swap instantly; that's an acceptable trade-off. */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color var(--motion-base),
+              color var(--motion-base),
+              border-color var(--motion-base),
+              box-shadow var(--motion-base),
+              fill var(--motion-base) !important;
+}
 
 /* Reduced-motion respect */
 @media (prefers-reduced-motion: reduce) {
@@ -381,11 +460,21 @@ button { font-family: inherit; }
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: background var(--motion-fast), color var(--motion-fast);
+  transition: background var(--motion-fast), color var(--motion-fast),
+              transform var(--motion-fast);
 
   &:hover {
     background: var(--surface-200);
     color: var(--text-strong);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--brand-focus-ring);
   }
 
   &--danger:hover {
@@ -441,6 +530,9 @@ button { font-family: inherit; }
   padding: var(--page-padding-y) var(--page-padding-x) 48px;
   max-width: var(--app-max-width);
   margin: 0 auto;
+  /* Subtle enter animation on route change — the router recreates the
+     .page element on each navigation, so this runs once per route. */
+  animation: fade-in var(--motion-base) both;
 
   &--narrow {
     max-width: var(--app-max-width-narrow);
@@ -552,11 +644,18 @@ button { font-family: inherit; }
     color: var(--text-base);
     background: var(--surface-0);
     font-family: inherit;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast),
+                background-color var(--motion-fast);
 
     &:focus {
       outline: none;
       border-color: var(--brand-400);
       box-shadow: 0 0 0 3px var(--brand-focus-ring);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
   }
 

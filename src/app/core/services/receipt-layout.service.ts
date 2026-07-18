@@ -1,6 +1,8 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { StorageService } from './storage.service';
+import { Injectable, inject, computed } from '@angular/core';
+import { DataProvider, Collections } from './data-provider';
 import { I18nService } from './i18n.service';
+import { UploadService } from './upload.service';
+import { parseImageSources } from '../utils/receipt-utils';
 import {
   buildDefaultLayout,
   DEFAULT_HEADER_STYLES,
@@ -11,72 +13,105 @@ import {
   ReceiptStyles,
 } from '../models/receipt.model';
 
-const STORAGE_KEY = 'receipt:layout';
-
 /**
  * Receipt layout service — manages the user-editable list of
  * `LayoutElement`s that define how the customer-facing receipt is laid out.
  *
- * The layout is persisted in localStorage so changes survive page reloads.
+ * The layout is persisted via `DataProvider` (single doc under
+ * `receipt:layout`) so changes survive page reloads and sync across
+ * devices when the user is signed in.
+ *
+ * Storage shape: The layout is stored as `{ elements: LayoutElement[] }`
+ * (an object wrapping the array). Firestore's `setDoc` requires a
+ * document (object), not a raw array — earlier versions stored the
+ * array directly, which worked with localStorage but crashed Firestore.
+ * The `layout` computed handles both shapes for backward compatibility
+ * with existing localStorage data.
+ *
  * Fixed elements (header, table, meta, visuals) cannot be removed — they
  * carry invoice-derived content — but their styles and visibility can be
  * tweaked. User-added text / image / divider elements are fully editable
  * and removable.
- *
- * The renderer (ReceiptRendererComponent) reads this layout and produces
- * the actual HTML, which the PDF service then snapshots.
  */
+interface StoredReceiptLayout {
+  elements: LayoutElement[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ReceiptLayoutService {
-  private readonly storage = inject(StorageService);
+  private readonly data = inject(DataProvider);
   private readonly i18n = inject(I18nService);
+  private readonly uploadService = inject(UploadService);
 
-  private readonly _layout = signal<LayoutElement[]>(this.loadLayout());
-  readonly layout = this._layout.asReadonly();
+  /** Raw doc signal — may be `{ elements: [...] }` (new shape) or a raw
+   *  `LayoutElement[]` (old localStorage shape, for backward compat). */
+  private readonly docSignal = this.data.doc<StoredReceiptLayout | LayoutElement[]>(Collections.receiptLayout);
+
+  /** Reactive layout — extracts the elements array from either storage
+   *  shape, falls back to the default layout if empty. */
+  readonly layout = computed<LayoutElement[]>(() => {
+    const stored = this.docSignal();
+    // Handle both shapes: new `{ elements: [...] }` and legacy raw array.
+    const elements = Array.isArray(stored) ? stored : stored?.elements;
+    if (elements && Array.isArray(elements) && elements.length > 0) {
+      return this.normalize(elements);
+    }
+    return buildDefaultLayout('receipt.defaultHeader', 'receipt.defaultTerms');
+  });
 
   /** Reorder the layout in-place (used by CDK drag-drop). */
-  reorder(newOrder: LayoutElement[]): void {
-    const numbered = newOrder.map((el) => ({ ...el }));
-    this._layout.set(numbered);
-    this.persist();
+  async reorder(newOrder: LayoutElement[]): Promise<void> {
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, {
+      elements: newOrder.map((el) => ({ ...el })),
+    });
   }
 
   /** Replace the entire layout (used by settings import). */
-  replaceAll(layout: LayoutElement[]): void {
-    const normalized = this.normalize(layout);
-    this._layout.set(normalized);
-    this.persist();
+  async replaceAll(layout: LayoutElement[]): Promise<void> {
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, {
+      elements: this.normalize(layout),
+    });
   }
 
   /** Update an element by id with a partial patch. */
-  updateElement(id: string, patch: Partial<LayoutElement>): void {
-    this._layout.update((list) =>
-      list.map((el) => (el.id === id ? { ...el, ...patch } : el)),
-    );
-    this.persist();
+  async updateElement(id: string, patch: Partial<LayoutElement>): Promise<void> {
+    const existing = this.layout().find((el) => el.id === id);
+    if (existing && patch.content !== undefined && (existing.type === 'image' || existing.type === 'visuals')) {
+      const oldUrls = parseImageSources(existing.content);
+      const newUrls = new Set(parseImageSources(patch.content));
+      const deletedUrls = oldUrls.filter((url) => !newUrls.has(url));
+      await Promise.all(deletedUrls.map((url) => this.uploadService.delete(url)));
+    }
+
+    const next = this.layout().map((el) => (el.id === id ? { ...el, ...patch } : el));
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, { elements: next });
   }
 
   /** Toggle visibility of an element. */
-  toggleVisibility(id: string): void {
-    this._layout.update((list) =>
-      list.map((el) =>
-        el.id === id ? { ...el, visible: !el.visible } : el,
-      ),
+  async toggleVisibility(id: string): Promise<void> {
+    const next = this.layout().map((el) =>
+      el.id === id ? { ...el, visible: !el.visible } : el,
     );
-    this.persist();
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, { elements: next });
   }
 
   /** Remove an element by id. Fixed elements cannot be removed. */
-  removeElement(id: string): boolean {
-    const el = this._layout().find((e) => e.id === id);
+  async removeElement(id: string): Promise<boolean> {
+    const el = this.layout().find((e) => e.id === id);
     if (!el || el.fixed) return false;
-    this._layout.update((list) => list.filter((e) => e.id !== id));
-    this.persist();
+
+    if (el.type === 'image' || el.type === 'visuals') {
+      const urls = parseImageSources(el.content);
+      await Promise.all(urls.map((url) => this.uploadService.delete(url)));
+    }
+
+    const next = this.layout().filter((e) => e.id !== id);
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, { elements: next });
     return true;
   }
 
   /** Add a new user element of the given type. Returns the new element's id. */
-  addElement(type: LayoutElementType): string {
+  async addElement(type: LayoutElementType): Promise<string> {
     const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const newEl: LayoutElement = {
       id,
@@ -91,40 +126,42 @@ export class ReceiptLayoutService {
             ? { ...DEFAULT_IMAGE_STYLES }
             : undefined,
     };
-    this._layout.update((list) => [...list, newEl]);
-    this.persist();
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, {
+      elements: [...this.layout(), newEl],
+    });
     return id;
   }
 
   /** Update a style key on an element. */
-  updateStyle(id: string, key: keyof ReceiptStyles, value: string): void {
-    this._layout.update((list) =>
-      list.map((el) => {
-        if (el.id !== id) return el;
-        const nextStyles: ReceiptStyles = { ...(el.styles ?? {}), [key]: value };
-        // Normalize empty string to deletion.
-        if (value === '' || value == null) {
-          delete (nextStyles as Record<string, unknown>)[key as string];
-        }
-        return { ...el, styles: nextStyles };
-      }),
-    );
-    this.persist();
+  async updateStyle(id: string, key: keyof ReceiptStyles, value: string): Promise<void> {
+    const next = this.layout().map((el) => {
+      if (el.id !== id) return el;
+      const nextStyles: ReceiptStyles = { ...(el.styles ?? {}), [key]: value };
+      // Normalize empty string to deletion.
+      if (value === '' || value == null) {
+        delete (nextStyles as Record<string, unknown>)[key as string];
+      }
+      return { ...el, styles: nextStyles };
+    });
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, { elements: next });
   }
 
   /** Replace the layout with the default. */
-  resetToDefault(): void {
-    const fresh = buildDefaultLayout(
-      'receipt.defaultHeader',
-      'receipt.defaultTerms',
-    );
-    this._layout.set(fresh);
-    this.persist();
+  async resetToDefault(): Promise<void> {
+    const fresh = buildDefaultLayout('receipt.defaultHeader', 'receipt.defaultTerms');
+    await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, { elements: fresh });
   }
 
   /** True if the element can be removed (not fixed). */
   isRemovable(el: LayoutElement): boolean {
     return !el.fixed;
+  }
+
+  /** True if the element with the given id can be removed. Convenience
+   *  wrapper around isRemovable(el) for callers that only have the id. */
+  isRemovableById(id: string): boolean {
+    const el = this.layout().find((e) => e.id === id);
+    return !!el && !el.fixed;
   }
 
   /** True if the element's content can be edited (text / image / header). */
@@ -143,39 +180,6 @@ export class ReceiptLayoutService {
   }
 
   // ---- internals ----
-
-  private loadLayout(): LayoutElement[] {
-    const stored = this.storage.read<LayoutElement[] | null>(STORAGE_KEY, null);
-    if (stored && Array.isArray(stored) && stored.length > 0) {
-      const normalized = this.normalize(stored);
-      if (!normalized.some((el) => el.type === 'notes')) {
-        const notesEl: LayoutElement = {
-          id: 'notes',
-          type: 'notes',
-          visible: true,
-          fixed: true,
-          labelKey: 'receipt.elements.notes',
-          styles: { ...DEFAULT_TEXT_STYLES },
-        };
-        const totalsIdx = normalized.findIndex((el) => el.type === 'totals');
-        if (totalsIdx >= 0) {
-          normalized.splice(totalsIdx + 1, 0, notesEl);
-        } else {
-          normalized.push(notesEl);
-        }
-        this.storage.write(STORAGE_KEY, normalized);
-      }
-      return normalized;
-    }
-    const fresh = buildDefaultLayout('receipt.defaultHeader', 'receipt.defaultTerms');
-    // Persist the defaults so the storage key is always populated.
-    this.storage.write(STORAGE_KEY, fresh);
-    return fresh;
-  }
-
-  private persist(): void {
-    this.storage.write(STORAGE_KEY, this._layout());
-  }
 
   /** Backfill missing styles with defaults — used when loading older layouts. */
   private normalize(items: LayoutElement[]): LayoutElement[] {

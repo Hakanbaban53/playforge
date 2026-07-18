@@ -55,7 +55,7 @@ export class BrowserFileStorageAdapter extends FileStorageAdapter {
         }
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => reject(new Error(String(req.error)));
     });
   }
 
@@ -77,7 +77,7 @@ export class BrowserFileStorageAdapter extends FileStorageAdapter {
       const tx = db.transaction(this.storeName, 'readwrite');
       tx.objectStore(this.storeName).put({ ...stored, bytes });
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(new Error(String(tx.error)));
     });
     return stored;
   }
@@ -107,7 +107,7 @@ export class BrowserFileStorageAdapter extends FileStorageAdapter {
       const tx = db.transaction(this.storeName, 'readwrite');
       tx.objectStore(this.storeName).delete(stored.id);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(new Error(String(tx.error)));
     });
     const url = this.urlCache.get(stored.id);
     if (url) {
@@ -126,7 +126,7 @@ export class BrowserFileStorageAdapter extends FileStorageAdapter {
         const result = req.result as ({ bytes: ArrayBuffer } & StoredFile) | undefined;
         resolve(result?.bytes ?? null);
       };
-      req.onerror = () => reject(req.error);
+      req.onerror = () => reject(new Error(String(req.error)));
     });
   }
 }

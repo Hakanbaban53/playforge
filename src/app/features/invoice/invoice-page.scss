@@ -89,6 +89,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  animation: fade-in var(--motion-base) both;
+
+  &--leaving {
+    animation: list-item-exit var(--motion-base) var(--ease-accelerate) both;
+  }
 
   &__top {
     display: flex;
@@ -193,10 +198,16 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    transition: background var(--motion-fast), color var(--motion-fast);
 
     &:hover {
       color: var(--danger-500);
       background: var(--danger-50);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
     }
   }
 
@@ -231,11 +242,12 @@
     background: var(--surface-0);
     color: var(--text-base);
     font-family: inherit;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px var(--brand-focus-ring);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 
@@ -308,6 +320,11 @@
   border: 1px solid var(--surface-200);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
+  animation: fade-in var(--motion-base) both;
+
+  &--leaving {
+    animation: list-item-exit var(--motion-base) var(--ease-accelerate) both;
+  }
 
   &__name {
     flex: 1 1 120px;
@@ -320,11 +337,12 @@
     background: var(--surface-0);
     color: var(--text-base);
     font-family: inherit;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px var(--brand-focus-ring);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 
@@ -339,11 +357,12 @@
     color: var(--text-base);
     font-family: inherit;
     cursor: pointer;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px var(--brand-focus-ring);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 
@@ -366,10 +385,12 @@
       margin: 0;
     }
 
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+
     &:focus {
       outline: none;
       border-color: var(--brand-400);
-      box-shadow: 0 0 0 2px var(--brand-focus-ring);
+      box-shadow: 0 0 0 3px var(--brand-focus-ring);
     }
   }
 
@@ -393,10 +414,16 @@
     border-radius: 4px;
     display: grid;
     place-items: center;
+    transition: background var(--motion-fast), color var(--motion-fast);
 
     &:hover {
       color: var(--danger-500);
       background: var(--danger-50);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--brand-focus-ring);
     }
   }
 }
@@ -449,6 +476,7 @@
   font-family: inherit;
   color: var(--text-base);
   resize: vertical;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 
   &:focus {
     outline: none;

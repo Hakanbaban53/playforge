@@ -5,7 +5,6 @@ import { InvoiceService } from './invoice.service';
 import { ReceiptLayoutService } from './receipt-layout.service';
 import { ReceiptHtmlBuilder } from './receipt-html-builder.service';
 import { ImageResolverService } from './image-resolver.service';
-import { parseStoredFileRef } from './file-storage.adapter';
 
 /**
  * Client-side PDF service — multi-page, element-aware pagination.
@@ -22,11 +21,16 @@ import { parseStoredFileRef } from './file-storage.adapter';
  *      container, html2canvas that container, and add the canvas as a
  *      full page to jsPDF.
  *
- * This guarantees:
- *   - No element is split across pages (each element is atomic).
- *   - Each PDF page is a complete, self-contained snapshot.
- *   - Large images get their own page if needed.
- *   - The on-screen preview shows page breaks visually.
+ * Image handling:
+ *   All image references (`idb://`, `fbstorage://`, `https://`, etc.) are
+ *   resolved to base64 data URIs BEFORE the HTML is inserted into the DOM.
+ *   This prevents the browser from trying to load `fbstorage://` pseudo-URLs
+ *   (which fail with `ERR_UNKNOWN_URL_SCHEME`) or Firebase Storage download
+ *   URLs (which fail with CORS errors when `fetch()`-ed from localhost).
+ *
+ *   For `fbstorage://` refs, `resolveToDataUri()` downloads bytes via the
+ *   Firebase Storage SDK (`getBytes`), which bypasses CORS entirely — no
+ *   download URL, no `fetch()`, just the SDK's own authenticated transport.
  */
 @Injectable({ providedIn: 'root' })
 export class PdfService {
@@ -44,33 +48,39 @@ export class PdfService {
     const layout = this.receiptLayout.layout();
     const paperSize = invoice.meta.paperSize;
 
-    // 1. Build the full HTML and render off-DOM to extract element HTML.
+    // 1. Build the full HTML.
     const fullHtml = this.htmlBuilder.build(invoice, layout);
+
+    // 2. Pre-inline ALL images to data URIs BEFORE inserting into DOM.
+    //    This is critical: if we insert the HTML first, the browser tries
+    //    to load `fbstorage://` and Firebase download URLs immediately,
+    //    causing ERR_UNKNOWN_URL_SCHEME and CORS errors. By replacing
+    //    all image srcs with data URIs in the HTML string first, the
+    //    browser never attempts to load the original URLs.
+    const inlinedHtml = await this.inlineImageSrcsInHtml(fullHtml);
+
+    // 3. Render off-DOM to extract element HTML.
     const tempContainer = document.createElement('div');
     tempContainer.style.position = 'fixed';
     tempContainer.style.left = '-99999px';
     tempContainer.style.top = '0';
     tempContainer.style.width = `${PdfService.PAGE_WIDTH_PX}px`;
     tempContainer.style.background = '#ffffff';
-    tempContainer.innerHTML = fullHtml;
+    tempContainer.innerHTML = inlinedHtml;
     document.body.appendChild(tempContainer);
 
     try {
-      // 2. Pre-resolve images in the temp container.
-      await this.preResolveImages(tempContainer);
-      await this.inlineImages(tempContainer);
-
-      // 3. Extract the <style> block and individual element nodes.
+      // 4. Extract the <style> block and individual element nodes.
       const styleBlock = tempContainer.querySelector('style')?.outerHTML ?? '';
       const sheet = tempContainer.querySelector('.sheet') ?? tempContainer;
       const elementNodes = Array.from(sheet.children).filter(
         (n) => n.tagName.toLowerCase() !== 'style',
       );
 
-      // 4. Group elements into pages based on measured heights.
+      // 5. Group elements into pages based on measured heights.
       const pages = this.groupIntoPages(elementNodes);
 
-      // 5. Create the PDF.
+      // 6. Create the PDF.
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'pt',
@@ -84,6 +94,8 @@ export class PdfService {
         if (i > 0) pdf.addPage();
 
         // Build a fresh container with just this page's elements.
+        // The outerHTML already contains data URIs (from step 2), so
+        // no further image resolution is needed here.
         const pageContainer = document.createElement('div');
         pageContainer.style.position = 'fixed';
         pageContainer.style.left = '-99999px';
@@ -94,8 +106,8 @@ export class PdfService {
         document.body.appendChild(pageContainer);
 
         try {
-          // Inline images in this page container too.
-          await this.inlineImages(pageContainer);
+          // Wait for all images in this page to finish loading.
+          await this.waitForImages(pageContainer);
 
           const canvas = await html2canvas(pageContainer, {
             scale: 2,
@@ -116,13 +128,78 @@ export class PdfService {
         }
       }
 
-      // 6. Download.
+      // 7. Download.
       const blob = pdf.output('blob');
       this.triggerDownload(blob, fileName);
       return pages.length;
     } finally {
       document.body.removeChild(tempContainer);
     }
+  }
+
+  /**
+   * Find all `src="..."` attributes in the HTML string, resolve each
+   * image reference to a base64 data URI, and return the HTML with
+   * data URIs substituted in. This runs BEFORE the HTML is inserted
+   * into the DOM, so the browser never tries to load `fbstorage://`
+   * or Firebase download URLs.
+   */
+  private async inlineImageSrcsInHtml(html: string): Promise<string> {
+    // Match all src="..." attributes (both single and double quotes).
+    const srcRegex = /src=["']([^"']+)["']/g;
+    const matches: { fullMatch: string; url: string }[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = srcRegex.exec(html)) !== null) {
+      matches.push({ fullMatch: m[0], url: m[1] });
+    }
+
+    if (matches.length === 0) return html;
+
+    // Resolve all unique image URLs to data URIs in parallel.
+    const uniqueUrls = [...new Set(matches.map((x) => x.url))];
+    const dataUriMap = new Map<string, string>();
+    await Promise.all(
+      uniqueUrls.map(async (url) => {
+        const dataUri = await this.imageResolver.resolveToDataUri(url);
+        dataUriMap.set(url, dataUri || this.placeholderDataUri());
+      }),
+    );
+
+    // Replace all src="..." in the HTML with the data URIs.
+    let result = html;
+    for (const { fullMatch, url } of matches) {
+      const dataUri = dataUriMap.get(url) ?? this.placeholderDataUri();
+      result = result.replace(fullMatch, `src="${dataUri}"`);
+    }
+    return result;
+  }
+
+  /** Wait for all <img> elements in a container to finish loading. */
+  private waitForImages(root: HTMLElement): Promise<void> {
+    const imgs = Array.from(root.querySelectorAll('img'));
+    return Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete && img.naturalWidth > 0) {
+              resolve();
+              return;
+            }
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          }),
+      ),
+    ).then(() => undefined);
+  }
+
+  /** SVG placeholder for images that fail to load. */
+  private placeholderDataUri(): string {
+    return (
+      'data:image/svg+xml;base64,' +
+      btoa(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="120"><rect width="100%" height="100%" fill="#f1f5f7"/><text x="50%" y="50%" font-family="sans-serif" font-size="14" fill="#6b7782" text-anchor="middle" dominant-baseline="middle">image unavailable</text></svg>`,
+      )
+    );
   }
 
   /**
@@ -160,88 +237,6 @@ export class PdfService {
     }
 
     return pages.length > 0 ? pages : [[]];
-  }
-
-  private async preResolveImages(root: HTMLElement): Promise<void> {
-    const imgs = Array.from(root.querySelectorAll('img'));
-    await Promise.all(
-      imgs.map(async (img) => {
-        const src = img.getAttribute('src');
-        if (!src) return;
-        const ref = parseStoredFileRef(src);
-        if (!ref) return;
-        const resolved = await this.imageResolver.resolve(src);
-        img.setAttribute('src', resolved);
-      }),
-    );
-  }
-
-  private async inlineImages(root: HTMLElement): Promise<void> {
-    const imgs = Array.from(root.querySelectorAll('img'));
-    await Promise.all(
-      imgs.map(async (img) => {
-        const src = img.getAttribute('src');
-        if (!src || src.startsWith('data:')) return;
-        try {
-          const dataUri = await this.fetchAsDataUri(src);
-          img.setAttribute('src', dataUri);
-          await new Promise<void>((resolve) => {
-            const tmp = new Image();
-            tmp.onload = () => resolve();
-            tmp.onerror = () => resolve();
-            tmp.src = dataUri;
-          });
-        } catch (err) {
-          console.warn(`[PDF] Failed to inline image ${src}:`, err);
-          img.setAttribute(
-            'src',
-            'data:image/svg+xml;base64,' +
-              btoa(
-                `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="120"><rect width="100%" height="100%" fill="#f1f5f7"/><text x="50%" y="50%" font-family="sans-serif" font-size="14" fill="#6b7782" text-anchor="middle" dominant-baseline="middle">image unavailable</text></svg>`,
-              ),
-          );
-        }
-      }),
-    );
-  }
-
-  private async fetchAsDataUri(url: string): Promise<string> {
-    try {
-      const res = await fetch(url, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      return await this.blobToDataUri(blob);
-    } catch {
-      return this.canvasDataUri(url);
-    }
-  }
-
-  private blobToDataUri(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  private canvasDataUri(url: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || 400;
-        canvas.height = img.naturalHeight || 300;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('No 2D context')); return; }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        try { resolve(canvas.toDataURL('image/png')); }
-        catch (err) { reject(err); }
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
   }
 
   private triggerDownload(blob: Blob, fileName: string): void {

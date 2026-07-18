@@ -692,10 +692,10 @@ export class ExcelImportService {
    *     updated, other families are left untouched). If the code doesn't
    *     exist, the family is added as new.
    */
-  applyDrafts(
+  async applyDrafts(
     drafts: ImportedProductDraft[],
     mode: 'replace' | 'merge' = 'replace',
-  ): { families: number; variants: number; created: number; updated: number } {
+  ): Promise<{ families: number; variants: number; created: number; updated: number }> {
     const byFamilyCode = new Map<string, ImportedProductDraft[]>();
     for (const d of drafts) {
       const list = byFamilyCode.get(d.familyCode) ?? [];
@@ -708,7 +708,7 @@ export class ExcelImportService {
     if (mode === 'replace') {
       // Old behavior: wipe everything, write only the new data.
       const { families, variants } = this.buildFromDrafts(byFamilyCode, now);
-      this.catalog.replaceAll(families, variants);
+      await this.catalog.replaceAll(families, variants);
       return {
         families: families.length,
         variants: variants.length,
@@ -809,7 +809,7 @@ export class ExcelImportService {
       }
     }
 
-    this.catalog.replaceAll(existingFamilies, existingVariants);
+    await this.catalog.replaceAll(existingFamilies, existingVariants);
     return {
       families: existingFamilies.length,
       variants: existingVariants.length,
@@ -1231,15 +1231,15 @@ export class ExcelImportService {
    * - `'merge'` keeps existing customers; if a customer with the same name
    *   (case-insensitive) exists, it is updated; otherwise a new one is created.
    */
-  applyCustomerDrafts(
+  async applyCustomerDrafts(
     drafts: ImportedCustomerDraft[],
     mode: 'replace' | 'merge' = 'replace',
-  ): { created: number; updated: number } {
+  ): Promise<{ created: number; updated: number }> {
     if (mode === 'replace') {
       // Remove all existing customers first.
-      this.customersService.clearAll();
+      await this.customersService.clearAll();
       for (const d of drafts) {
-        this.customersService.add({
+        await this.customersService.add({
           name: d.name,
           taxId: d.taxId || undefined,
           email: d.email || undefined,
@@ -1262,7 +1262,7 @@ export class ExcelImportService {
       const key = d.name.toLowerCase();
       const existing = existingByName.get(key);
       if (existing) {
-        this.customersService.update(existing.id, {
+        await this.customersService.update(existing.id, {
           taxId: d.taxId || undefined,
           email: d.email || undefined,
           phone: d.phone || undefined,
@@ -1271,7 +1271,7 @@ export class ExcelImportService {
         });
         updated++;
       } else {
-        this.customersService.add({
+        await this.customersService.add({
           name: d.name,
           taxId: d.taxId || undefined,
           email: d.email || undefined,

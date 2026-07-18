@@ -186,19 +186,19 @@ export class AppSettingsService {
    * sections are skipped. Returns the lists of applied and skipped
    * section names so the UI can report a granular result.
    */
-  apply(bundle: AppSettingsBundle, sections: (keyof AppSettingsBundle)[]): AppSettingsApplyResult {
+  async apply(bundle: AppSettingsBundle, sections: (keyof AppSettingsBundle)[]): Promise<AppSettingsApplyResult> {
     const applied: string[] = [];
     const skipped: string[] = [];
 
     if (sections.includes('receiptLayout') && bundle.receiptLayout) {
-      this.receiptLayout.replaceAll(bundle.receiptLayout);
+      await this.receiptLayout.replaceAll(bundle.receiptLayout);
       applied.push('receiptLayout');
     } else {
       skipped.push('receiptLayout');
     }
 
     if (sections.includes('invoiceDefaults') && bundle.invoiceDefaults) {
-      this.invoiceDefaults.update(bundle.invoiceDefaults);
+      await this.invoiceDefaults.update(bundle.invoiceDefaults);
       applied.push('invoiceDefaults');
     } else {
       skipped.push('invoiceDefaults');
@@ -207,17 +207,17 @@ export class AppSettingsService {
     if (sections.includes('currency') && bundle.currency) {
       const { rates, base } = bundle.currency;
       // setRate ignores USD; setBase persists.
-      (Object.keys(rates) as CurrencyCode[]).forEach((code) => {
-        if (code !== 'USD') this.currencyService.setRate(code, rates[code]);
-      });
-      this.currencyService.setBase(base);
+      for (const code of Object.keys(rates) as CurrencyCode[]) {
+        if (code !== 'USD') await this.currencyService.setRate(code, rates[code]);
+      }
+      await this.currencyService.setBase(base);
       applied.push('currency');
     } else {
       skipped.push('currency');
     }
 
     if (sections.includes('favorites') && bundle.favorites) {
-      this.favorites.replaceAll(bundle.favorites);
+      await this.favorites.replaceAll(bundle.favorites);
       applied.push('favorites');
     } else {
       skipped.push('favorites');

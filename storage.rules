@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// ============================================================================
+// Parkman / PlayForge — Firebase Storage Security Rules
+// ----------------------------------------------------------------------------
+// Per-user image storage. Each user's images live under
+// users/{uid}/images/{imageId}.{ext} and only the authenticated owner
+// can read or write them.
+//
+// Deploy with:
+//   firebase deploy --only storage
+//
+// What these rules do:
+//   1. IDENTITY: Only the authenticated owner can read/write/delete their
+//      own images. The path must start with users/{uid}/ and the
+//      request.auth.uid must match that {uid}.
+//   2. SIZE: Images must be under 10 MB (matches UploadService.MAX_BYTES).
+//   3. TYPE: Files must be images (content type starts with "image/").
+//      This prevents uploading arbitrary files (executables, scripts, etc.)
+//      to the storage bucket.
+//
+// What these rules DON'T do:
+//   - They don't validate image dimensions (Firestore Storage rules can't
+//     inspect image content). If you need dimension limits, do it client-side
+//     or via Cloud Functions.
+//   - They don't rate-limit uploads. Firebase Storage doesn't have built-in
+//     per-user rate limiting at the rules level. If abuse becomes a concern,
+//     add a Cloud Function trigger that counts uploads per user per hour.
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ---- Per-user image storage -------------------------------------------
+    //
+    // Match any file under users/{uid}/... . The {allPaths=**} wildcard
+    // catches the full path including the filename and extension.
+    match /users/{uid}/{allPaths=**} {
+      // Read (download): only the owner can download their images.
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // Create/Update (upload/overwrite): only the owner, and only if the file
+      // is an image under 10 MB.
+      allow create, update: if request.auth != null
+                            && request.auth.uid == uid
+                            && request.resource.size < 10 * 1024 * 1024
+                            && request.resource.contentType.matches('image/.*');
+
+      // Delete: only the authenticated owner can delete their images.
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---- Default: deny everything else ------------------------------------
+    //
+    // Any path NOT under users/{uid}/... is denied. This prevents
+    // uploading files to arbitrary locations in the bucket.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

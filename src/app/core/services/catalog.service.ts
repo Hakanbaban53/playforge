@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject } from '@angular/core';
 import {
   Part,
   ProductCategory,
@@ -7,14 +7,20 @@ import {
   ResolvedProduct,
   VariantOverride,
 } from '../models/catalog.model';
-import { StorageService } from './storage.service';
+import { DataProvider, Collections } from './data-provider';
+import { UploadService } from './upload.service';
 
 /**
  * Single source of truth for the catalog of families & variants.
  *
+ * Backed by `DataProvider` — when the user is signed in, families and
+ * variants sync to Firestore under `catalog:families` and
+ * `catalog:variants` collections. When signed out, they live in
+ * localStorage.
+ *
  * Responsibilities
  * ----------------
- * - Load/persist families & variants via `StorageService`.
+ * - Load/persist families & variants via `DataProvider`.
  * - Resolve a variant into a `ResolvedProduct` by merging family defaults
  *   with variant overrides. This is the merge contract for the family +
  *   variant inheritance model.
@@ -29,33 +35,29 @@ import { StorageService } from './storage.service';
  */
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
-  private readonly storage = inject(StorageService);
-  private readonly familiesKey = 'catalog:families';
-  private readonly variantsKey = 'catalog:variants';
+  private readonly data = inject(DataProvider);
+  private readonly uploadService = inject(UploadService);
 
   /** Signal-backed catalog state. */
-  private readonly _families = signal<ProductFamily[]>([]);
-  private readonly _variants = signal<ProductVariant[]>([]);
-
-  readonly families = this._families.asReadonly();
-  readonly variants = this._variants.asReadonly();
+  readonly families = this.data.collection<ProductFamily>(Collections.catalogFamilies);
+  readonly variants = this.data.collection<ProductVariant>(Collections.catalogVariants);
 
   /** Convenience computed maps — O(1) lookups from anywhere in the UI. */
   readonly familyById = computed(() => {
     const map = new Map<string, ProductFamily>();
-    for (const f of this._families()) map.set(f.id, f);
+    for (const f of this.families()) map.set(f.id, f);
     return map;
   });
 
   readonly variantById = computed(() => {
     const map = new Map<string, ProductVariant>();
-    for (const v of this._variants()) map.set(v.id, v);
+    for (const v of this.variants()) map.set(v.id, v);
     return map;
   });
 
   readonly variantsByFamily = computed(() => {
     const map = new Map<string, ProductVariant[]>();
-    for (const v of this._variants()) {
+    for (const v of this.variants()) {
       const list = map.get(v.familyId) ?? [];
       list.push(v);
       map.set(v.familyId, list);
@@ -63,44 +65,15 @@ export class CatalogService {
     return map;
   });
 
-  constructor() {
-    this.load();
-  }
-
-  /** Load (or initialize empty) the catalog from storage. */
-  private load(): void {
-    const storedFamilies = this.storage.read<ProductFamily[] | null>(
-      this.familiesKey,
-      null,
-    );
-    const storedVariants = this.storage.read<ProductVariant[] | null>(
-      this.variantsKey,
-      null,
-    );
-
-    if (storedFamilies && storedVariants) {
-      this._families.set(storedFamilies);
-      this._variants.set(storedVariants);
-    } else {
-      // First run — start with an empty catalog. The user adds products
-      // via Catalog Management or imports them via the Excel wizard.
-      this._families.set([]);
-      this._variants.set([]);
-      this.persist();
-    }
-  }
-
-  /** Persist current state to storage. */
-  private persist(): void {
-    this.storage.write(this.familiesKey, this._families());
-    this.storage.write(this.variantsKey, this._variants());
+  private async deleteImagesFromUrls(urls: string[]): Promise<void> {
+    await Promise.all(urls.map((url) => this.uploadService.delete(url)));
   }
 
   // ---------------------------------------------------------------------------
   // Family CRUD
   // ---------------------------------------------------------------------------
 
-  addFamily(family: Omit<ProductFamily, 'id' | 'createdAt' | 'updatedAt'>): ProductFamily {
+  async addFamily(family: Omit<ProductFamily, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductFamily> {
     const now = Date.now();
     const record: ProductFamily = {
       ...family,
@@ -108,32 +81,51 @@ export class CatalogService {
       createdAt: now,
       updatedAt: now,
     };
-    this._families.update((list) => [...list, record]);
-    this.persist();
+    await this.data.setRecord(Collections.catalogFamilies, record);
     return record;
   }
 
-  updateFamily(id: string, patch: Partial<ProductFamily>): void {
-    this._families.update((list) =>
-      list.map((f) =>
-        f.id === id ? { ...f, ...patch, updatedAt: Date.now() } : f,
-      ),
-    );
-    this.persist();
+  async updateFamily(id: string, patch: Partial<ProductFamily>): Promise<void> {
+    const existing = this.familyById().get(id);
+    if (!existing) return;
+
+    if (patch.images) {
+      const oldUrls = existing.images.map((img) => img.url);
+      const newUrls = new Set(patch.images.map((img) => img.url));
+      const deletedUrls = oldUrls.filter((url) => !newUrls.has(url));
+      await this.deleteImagesFromUrls(deletedUrls);
+    }
+
+    const updated: ProductFamily = { ...existing, ...patch, updatedAt: Date.now() };
+    await this.data.setRecord(Collections.catalogFamilies, updated);
   }
 
-  removeFamily(id: string): void {
-    this._families.update((list) => list.filter((f) => f.id !== id));
+  async removeFamily(id: string): Promise<void> {
+    const existing = this.familyById().get(id);
+    if (existing) {
+      const urls = existing.images.map((img) => img.url);
+      await this.deleteImagesFromUrls(urls);
+    }
+
     // Cascade: remove the family's variants too.
-    this._variants.update((list) => list.filter((v) => v.familyId !== id));
-    this.persist();
+    const variants = this.variantsByFamily().get(id) ?? [];
+    for (const v of variants) {
+      const imgOverride = v.overrides.find((o) => o.key === 'images');
+      if (imgOverride?.key === 'images') {
+        const urls = imgOverride.value.map((img) => img.url);
+        await this.deleteImagesFromUrls(urls);
+      }
+    }
+
+    await this.data.removeRecord(Collections.catalogFamilies, id);
+    await Promise.all(variants.map((v) => this.data.removeRecord(Collections.catalogVariants, v.id)));
   }
 
   // ---------------------------------------------------------------------------
   // Variant CRUD
   // ---------------------------------------------------------------------------
 
-  addVariant(variant: Omit<ProductVariant, 'id' | 'createdAt' | 'updatedAt'>): ProductVariant {
+  async addVariant(variant: Omit<ProductVariant, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductVariant> {
     const now = Date.now();
     const record: ProductVariant = {
       ...variant,
@@ -141,24 +133,46 @@ export class CatalogService {
       createdAt: now,
       updatedAt: now,
     };
-    this._variants.update((list) => [...list, record]);
-    this.persist();
+    await this.data.setRecord(Collections.catalogVariants, record);
     return record;
   }
 
-  updateVariant(id: string, patch: Partial<ProductVariant>): void {
-    this._variants.update((list) =>
-      list.map((v) =>
-        v.id === id ? { ...v, ...patch, updatedAt: Date.now() } : v,
-      ),
-    );
-    this.persist();
+  async updateVariant(id: string, patch: Partial<ProductVariant>): Promise<void> {
+    const existing = this.variantById().get(id);
+    if (!existing) return;
+
+    if (patch.overrides) {
+      const oldImgOverride = existing.overrides.find((o) => o.key === 'images');
+      const newImgOverride = patch.overrides.find((o) => o.key === 'images');
+
+      if (oldImgOverride?.key === 'images') {
+        const oldUrls = oldImgOverride.value.map((img) => img.url);
+        const newUrls = new Set(
+          newImgOverride?.key === 'images'
+            ? newImgOverride.value.map((img) => img.url)
+            : []
+        );
+        const deletedUrls = oldUrls.filter((url) => !newUrls.has(url));
+        await this.deleteImagesFromUrls(deletedUrls);
+      }
+    }
+
+    const updated: ProductVariant = { ...existing, ...patch, updatedAt: Date.now() };
+    await this.data.setRecord(Collections.catalogVariants, updated);
   }
 
-  removeVariant(id: string): void {
-    this._variants.update((list) => list.filter((v) => v.id !== id));
-    this.persist();
+  async removeVariant(id: string): Promise<void> {
+    const existing = this.variantById().get(id);
+    if (existing) {
+      const imgOverride = existing.overrides.find((o) => o.key === 'images');
+      if (imgOverride?.key === 'images') {
+        const urls = imgOverride.value.map((img) => img.url);
+        await this.deleteImagesFromUrls(urls);
+      }
+    }
+    await this.data.removeRecord(Collections.catalogVariants, id);
   }
+
 
   // ---------------------------------------------------------------------------
   // Resolution: variant -> ResolvedProduct
@@ -173,11 +187,22 @@ export class CatalogService {
     return this.merge(family, variant);
   }
 
-  /** Resolve every active variant in the catalog. */
+  /** Resolve every active variant in the catalog.
+   *
+   *  Race-condition safe: during Firestore snapshot cascades, the variants
+   *  collection may emit before the families collection (or vice versa).
+   *  We guard each lookup — variants whose family isn't loaded yet are
+   *  skipped rather than crashing. They'll appear in a subsequent
+   *  re-compute once both collections have emitted. */
   resolveAll(): ResolvedProduct[] {
-    return this._variants()
+    const familyById = this.familyById();
+    return this.variants()
       .filter((v) => v.active)
-      .map((v) => this.merge(this.familyById().get(v.familyId)!, v))
+      .map((v) => {
+        const family = familyById.get(v.familyId);
+        if (!family) return null;
+        return this.merge(family, v);
+      })
       .filter((r): r is ResolvedProduct => r !== null);
   }
 
@@ -187,28 +212,35 @@ export class CatalogService {
     if (!family) return [];
     return (this.variantsByFamily().get(familyId) ?? [])
       .filter((v) => v.active)
-      .map((v) => this.merge(family, v));
+      .map((v) => this.merge(family, v))
+      .filter((r): r is ResolvedProduct => r !== null);
   }
 
   /**
    * Core merge contract. Walks variant overrides and applies them on top of
    * family defaults. Anything not overridden is inherited.
+   *
+   * Defensive: guards against malformed/partial data (e.g. during Firestore
+   * snapshot cascades where a document may be briefly incomplete). If
+   * `family.availableParts` or `variant.overrides` is undefined, we fall
+   * back to empty arrays rather than crashing.
    */
   private merge(family: ProductFamily, variant: ProductVariant): ResolvedProduct {
     const overrides = new Map<VariantOverride['key'], VariantOverride>();
-    for (const ov of variant.overrides) overrides.set(ov.key, ov);
+    for (const ov of variant.overrides ?? []) overrides.set(ov.key, ov);
 
     // Resolve parts: either explicit override (list of part ids) or family default.
     const partOverride = overrides.get('parts');
+    const familyParts = family.availableParts ?? [];
     let parts: Part[];
-    if (partOverride && partOverride.key === 'parts') {
-      const byId = new Map(family.availableParts.map((p) => [p.id, p]));
+    if (partOverride?.key === 'parts') {
+      const byId = new Map(familyParts.map((p) => [p.id, p]));
       parts = partOverride.value
         .map((id) => byId.get(id))
         .filter((p): p is Part => p != null);
     } else {
       // Default: every available part is included (variants usually narrow this).
-      parts = [...family.availableParts];
+      parts = [...familyParts];
     }
 
     const size = overrides.get('size');
@@ -220,7 +252,7 @@ export class CatalogService {
     const imagesOv = overrides.get('images');
 
     const price =
-      priceOv && priceOv.key === 'price'
+      priceOv?.key === 'price'
         ? priceOv.value
         : // Default price = sum of part prices. Variant override replaces it.
           parts.reduce((sum, p) => sum + p.price, 0);
@@ -233,39 +265,38 @@ export class CatalogService {
       sku: variant.sku,
       category: family.category,
       description:
-        descOv && descOv.key === 'description' ? descOv.value : family.description,
+        descOv?.key === 'description' ? descOv.value : family.description,
       ageRange:
-        ageOv && ageOv.key === 'ageRange' ? ageOv.value : family.ageRange,
+        ageOv?.key === 'ageRange' ? ageOv.value : family.ageRange,
       currency:
-        currencyOv && currencyOv.key === 'currency'
+        currencyOv?.key === 'currency'
           ? currencyOv.value
           : family.currency,
-      tags: tagsOv && tagsOv.key === 'tags' ? tagsOv.value : [...family.tags],
+      tags: tagsOv?.key === 'tags' ? tagsOv.value : [...(family.tags ?? [])],
       images:
-        imagesOv && imagesOv.key === 'images' ? imagesOv.value : [...family.images],
+        imagesOv?.key === 'images' ? imagesOv.value : [...(family.images ?? [])],
       parts,
       price,
-      size: size && size.key === 'size' ? size.value : undefined,
+      size: size?.key === 'size' ? size.value : undefined,
     };
   }
 
   /** Replace the entire catalog (used by the Excel import flow). */
-  replaceAll(families: ProductFamily[], variants: ProductVariant[]): void {
-    this._families.set(families);
-    this._variants.set(variants);
-    this.persist();
+  async replaceAll(families: ProductFamily[], variants: ProductVariant[]): Promise<void> {
+    await Promise.all([
+      this.data.replaceCollection(Collections.catalogFamilies, families),
+      this.data.replaceCollection(Collections.catalogVariants, variants),
+    ]);
   }
 
   /** Hard reset — empty the catalog (used by Settings). */
-  clearAll(): void {
-    this._families.set([]);
-    this._variants.set([]);
-    this.persist();
+  async clearAll(): Promise<void> {
+    await this.replaceAll([], []);
   }
 
   /** True when storage has at least one family. */
   isSeeded(): boolean {
-    return this._families().length > 0;
+    return this.families().length > 0;
   }
 }
 

@@ -1,5 +1,5 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { StorageService } from './storage.service';
+import { Injectable, inject, computed } from '@angular/core';
+import { DataProvider, Collections } from './data-provider';
 import { PaperSize } from '../models/invoice.model';
 
 export interface InvoiceDefaults {
@@ -9,8 +9,6 @@ export interface InvoiceDefaults {
   sellerBlock: string;
   notes: string;
 }
-
-const STORAGE_KEY = 'app:invoice-defaults';
 
 const DEFAULTS: InvoiceDefaults = {
   paperSize: 'A4',
@@ -23,21 +21,26 @@ const DEFAULTS: InvoiceDefaults = {
 /**
  * Persisted invoice defaults — used by `InvoiceService` when creating a
  * fresh invoice, and editable from the Settings page.
+ *
+ * Stored as a single doc under `app:invoice-defaults`. Syncs to Firestore
+ * when the user is signed in.
  */
 @Injectable({ providedIn: 'root' })
 export class InvoiceDefaultsService {
-  private readonly storage = inject(StorageService);
+  private readonly data = inject(DataProvider);
 
-  private readonly _defaults = signal<InvoiceDefaults>(
-    this.storage.read<InvoiceDefaults>(STORAGE_KEY, DEFAULTS),
-  );
-  readonly defaults = this._defaults.asReadonly();
+  private readonly docSignal = this.data.doc<InvoiceDefaults>(Collections.invoiceDefaults);
 
-  update(patch: Partial<InvoiceDefaults>): void {
-    this._defaults.update((d) => {
-      const next = { ...d, ...patch };
-      this.storage.write(STORAGE_KEY, next);
-      return next;
-    });
+  /** Reactive defaults — merges stored doc with built-in DEFAULTS so
+   *  new fields added in future versions always have a sane value. */
+  readonly defaults = computed<InvoiceDefaults>(() => {
+    const stored = this.docSignal();
+    return { ...DEFAULTS, ...(stored ?? {}) };
+  });
+
+  /** Update — merges with current and persists. */
+  async update(patch: Partial<InvoiceDefaults>): Promise<void> {
+    const next: InvoiceDefaults = { ...DEFAULTS, ...this.defaults(), ...patch };
+    await this.data.setDoc(Collections.invoiceDefaults, next);
   }
 }

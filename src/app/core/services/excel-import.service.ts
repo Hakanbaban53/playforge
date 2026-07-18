@@ -72,9 +72,7 @@ export class ExcelImportService {
     'foundation',
   ];
 
-  // -------------------------------------------------------------------------
   // Template generation (localized)
-  // -------------------------------------------------------------------------
 
   /**
    * Build the workbook template as an `ArrayBuffer`, with column headers,
@@ -945,9 +943,7 @@ export class ExcelImportService {
     };
   }
 
-  // ---------------------------------------------------------------------------
   // Customer template generation + import
-  // ---------------------------------------------------------------------------
 
   /**
    * Generate the customer import template as an ArrayBuffer.

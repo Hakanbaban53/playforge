@@ -30,9 +30,7 @@ export interface ImportedProductDraft {
   /** Variant label, e.g. "5m". Optional — defaults to "Standard". */
   variantLabel?: string;
   variantSku: string;
-  /** Size override (free text). */
   size?: string;
-  /** Unit price. */
   price: number;
   currency: string;
   ageRange?: string;
@@ -65,13 +63,9 @@ export interface ImportRowError {
 export interface ImportValidationResult {
   /** Drafts that passed all `error`-severity checks. */
   valid: ImportedProductDraft[];
-  /** Drafts that have at least one error; kept for display. */
   invalid: ImportedProductDraft[];
-  /** All errors across all rows. */
   errors: ImportRowError[];
-  /** Warnings across all rows. */
   warnings: ImportRowError[];
-  /** Total row count (valid + invalid). */
   totalRows: number;
 }
 
@@ -82,9 +76,7 @@ export type ImportAction = 'create-family' | 'update-family' | 'create-variant' 
 export interface ImportPreviewRow {
   draft: ImportedProductDraft | ImportedCustomerDraft;
   action: ImportAction;
-  /** True if the row is selected for import (user can toggle). */
   selected: boolean;
-  /** Conflict warnings specific to this row. */
   conflicts: string[];
 }
 

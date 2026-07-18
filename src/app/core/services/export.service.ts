@@ -153,9 +153,6 @@ export class ExportService {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
-
-  // ---- Catalog rows ----
-
   private buildCatalogRows(): (string | number)[][] {
     const families = this.catalog.families();
     const variantsByFamily = this.catalog.variantsByFamily();
@@ -236,9 +233,6 @@ export class ExportService {
       (key) => this.i18n.t(TEMPLATE_COLUMNS[key]),
     );
   }
-
-  // ---- Invoice rows ----
-
   private invoiceHeaders(): string[] {
     return [
       'Invoice Number',
@@ -290,9 +284,6 @@ export class ExportService {
       inv.meta.paperSize,
     ];
   }
-
-  // ---- Customer rows ----
-
   private customerTranslatedHeaders(): string[] {
     return (Object.keys(CUSTOMER_TEMPLATE_COLUMNS) as CustomerTemplateColumnKey[]).map(
       (key) => this.i18n.t(CUSTOMER_TEMPLATE_COLUMNS[key]),
@@ -310,9 +301,6 @@ export class ExportService {
       c.notes ?? '',
     ]);
   }
-
-  // ---- Blob converters ----
-
   private toXlsxBlob(rows: (string | number)[][], sheetName: string): Blob {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = rows[0].map((_, i) => {

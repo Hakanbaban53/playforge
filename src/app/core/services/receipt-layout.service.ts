@@ -152,7 +152,6 @@ export class ReceiptLayoutService {
     await this.data.setDoc<StoredReceiptLayout>(Collections.receiptLayout, { elements: fresh });
   }
 
-  /** True if the element can be removed (not fixed). */
   isRemovable(el: LayoutElement): boolean {
     return !el.fixed;
   }
@@ -164,23 +163,17 @@ export class ReceiptLayoutService {
     return !!el && !el.fixed;
   }
 
-  /** True if the element's content can be edited (text / image / header). */
   isContentEditable(el: LayoutElement): boolean {
     return el.type === 'header' || el.type === 'text' || el.type === 'image';
   }
 
-  /** True if the element supports text styling. */
   isTextStylable(el: LayoutElement): boolean {
     return el.type === 'header' || el.type === 'text' || el.type === 'notes';
   }
 
-  /** True if the element supports image styling. */
   isImageStylable(el: LayoutElement): boolean {
     return el.type === 'image' || el.type === 'visuals';
   }
-
-  // ---- internals ----
-
   /** Backfill missing styles with defaults — used when loading older layouts. */
   private normalize(items: LayoutElement[]): LayoutElement[] {
     return items.map((item) => {

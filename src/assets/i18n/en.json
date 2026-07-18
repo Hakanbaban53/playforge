@@ -663,7 +663,28 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "signingIn": "Signing in…",
-    "signInWithGoogle": "Sign in with Google"
+    "signInWithGoogle": "Sign in with Google",
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "sessionEndedElsewhere": "You signed out in another tab.",
+    "callback": {
+      "tagline": "Sales & Configurator",
+      "promptTitle": "Sign in to PlayForge",
+      "promptBody": "Use your Google account to securely connect to the app.",
+      "loadingTitle": "Signing you in",
+      "loadingBody": "Completing the sign-in flow, please wait…",
+      "successTitle": "Sign-in successful",
+      "successBody": "Redirecting you back to the app…",
+      "successOpenApp": "Open the app",
+      "successHint": "If the app doesn't open automatically, tap the button above.",
+      "errorTitle": "Sign-in failed",
+      "errorRetry": "Try again",
+      "errorReturn": "Return to app",
+      "errorExpired": "The sign-in session expired. Please try again.",
+      "errorDenied": "Permission was denied. Please try again and approve the prompt.",
+      "errorNetwork": "Network error — please check your connection and try again.",
+      "errorConfig": "Firebase is not configured. Please contact support.",
+      "errorDefault": "Something went wrong during sign-in."
+    }
   },
   "merge": {
     "title": "Upload your local data?",

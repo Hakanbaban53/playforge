@@ -223,9 +223,6 @@ export class FirestoreDataProvider extends DataProvider {
     this._syncState.set('synced');
     return Promise.resolve();
   }
-
-  // ---- internals ----
-
   private getOrCreateCollectionSignal<T>(name: string): WritableSignal<T[]> {
     let sig = this.collectionSignals.get(name) as WritableSignal<T[]> | undefined;
     if (!sig) {

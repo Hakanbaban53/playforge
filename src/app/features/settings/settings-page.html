@@ -92,7 +92,7 @@
             [disabled]="auth.signingIn()"
           >
             @if (auth.signingIn()) {
-              <app-icon name="progress_activity" [size]="14" [class.btn__spinner-icon]="true" />
+              <app-spinner [size]="14" />
               {{ 'auth.signingIn' | translate }}
             } @else {
               <span class="btn__google-g" aria-hidden="true">G</span>
@@ -111,7 +111,7 @@
 
         @if (updateService.checking()) {
           <div class="update-status">
-            <app-icon name="progress_activity" [size]="16" />
+            <app-spinner [size]="16" />
             {{ 'settings.checkingForUpdates' | translate }}
           </div>
         }

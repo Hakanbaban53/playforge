@@ -5,7 +5,7 @@ import {
   provideAppInitializer,
   inject,
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, withComponentInputBinding, TitleStrategy } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideTranslateService, TranslateLoader } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
@@ -18,6 +18,8 @@ import { BrowserFileStorageAdapter } from './core/services/browser-file-storage.
 import { TauriFileStorageAdapter } from './core/services/tauri-file-storage.adapter';
 import { I18nService } from './core/services/i18n.service';
 import { AuthService } from './core/services/auth.service';
+import { SessionWatcher } from './core/services/session-watcher.service';
+import { TranslatableTitleStrategy } from './core/services/translatable-title.strategy';
 import { DataProvider } from './core/services/data-provider';
 import { DataProviderService } from './core/services/data-provider-service';
 
@@ -44,9 +46,8 @@ export const appConfig: ApplicationConfig = {
     }),
     provideAppInitializer(() => inject(I18nService).init()),
     provideAppInitializer(() => { inject(ThemeService); }),
-    // Initialize Firebase + AuthService on startup. If Firebase is
-    // disabled in environment.ts, these are no-ops.
     provideAppInitializer(() => { inject(AuthService); }),
+    provideAppInitializer(() => { inject(SessionWatcher); }),
     {
       provide: FileStorageAdapter,
       useFactory: () => {
@@ -56,8 +57,7 @@ export const appConfig: ApplicationConfig = {
         return new BrowserFileStorageAdapter();
       },
     },
-    // DataProvider is implemented by DataProviderService, which proxies
-    // to LocalDataProvider or FirestoreDataProvider based on auth state.
     { provide: DataProvider, useExisting: DataProviderService },
+    { provide: TitleStrategy, useClass: TranslatableTitleStrategy },
   ],
 };

@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService } from '@ngx-translate/core';
 import { ReceiptLayoutService } from './receipt-layout.service';
+import { provideInMemoryDataAndStubAuth } from './testing';
 
 /**
  * ReceiptLayoutService tests — covers default layout, add/remove/toggle
@@ -18,6 +19,7 @@ describe('ReceiptLayoutService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService({}),
+        ...provideInMemoryDataAndStubAuth(),
       ],
     });
     service = TestBed.inject(ReceiptLayoutService);
@@ -29,16 +31,18 @@ describe('ReceiptLayoutService', () => {
     expect(layout.map((el) => el.id)).toEqual([
       'header', 'meta', 'table', 'totals', 'notes', 'terms', 'visuals',
     ]);
-    // Fixed elements cannot be removed.
     expect(layout.every((el) => el.fixed)).toBe(true);
   });
 
-  it('persists layout to localStorage', () => {
-    expect(localStorage.getItem('pgpos:receipt:layout')).not.toBeNull();
+  it('exposes the layout via the reactive signal', () => {
+    // The layout is backed by DataProvider.doc() — the spec doesn't
+    // verify localStorage directly because the stub DataProvider is
+    // in-memory. Reading the signal confirms the layout is initialized.
+    expect(service.layout().length).toBe(7);
   });
 
-  it('addElement(text) appends a new text element with default styles', () => {
-    const id = service.addElement('text');
+  it('addElement(text) appends a new text element with default styles', async () => {
+    const id = await service.addElement('text');
     const layout = service.layout();
     expect(layout.length).toBe(8);
     const added = layout.find((el) => el.id === id);
@@ -48,73 +52,75 @@ describe('ReceiptLayoutService', () => {
     expect(added!.styles?.fontSize).toBe('14px');
   });
 
-  it('addElement(image) appends a new image element with image styles', () => {
-    const id = service.addElement('image');
+  it('addElement(image) appends a new image element with image styles', async () => {
+    const id = await service.addElement('image');
     const added = service.layout().find((el) => el.id === id);
     expect(added!.styles?.imageFit).toBe('contain');
   });
 
-  it('addElement(totals) appends a new totals element (draggable, removable)', () => {
-    const id = service.addElement('totals');
+  it('addElement(totals) appends a new totals element (draggable, removable)', async () => {
+    const id = await service.addElement('totals');
     const added = service.layout().find((el) => el.id === id);
     expect(added!.type).toBe('totals');
     expect(added!.fixed).toBeFalsy();
-    // Totals elements added by the user are removable (the default one is fixed).
     expect(service.isRemovable(added!)).toBe(true);
   });
 
-  it('removeElement() removes user-added elements but not fixed ones', () => {
-    const id = service.addElement('text');
+  it('removeElement() removes user-added elements but not fixed ones', async () => {
+    const id = await service.addElement('text');
     expect(service.layout().length).toBe(8);
 
-    const removed = service.removeElement(id);
+    const removed = await service.removeElement(id);
     expect(removed).toBe(true);
     expect(service.layout().length).toBe(7);
 
-    // Try to remove a fixed element — should fail.
-    const fixedRemoved = service.removeElement('header');
+    const fixedRemoved = await service.removeElement('header');
     expect(fixedRemoved).toBe(false);
     expect(service.layout().length).toBe(7);
   });
 
-  it('toggleVisibility() flips the visible flag', () => {
+  it('toggleVisibility() flips the visible flag', async () => {
     const before = service.layout().find((el) => el.id === 'header')!.visible;
-    service.toggleVisibility('header');
+    await service.toggleVisibility('header');
     const after = service.layout().find((el) => el.id === 'header')!.visible;
     expect(after).toBe(!before);
   });
 
-  it('updateElement() applies a partial patch', () => {
-    service.updateElement('header', { content: 'New header text' });
+  it('updateElement() applies a partial patch', async () => {
+    await service.updateElement('header', { content: 'New header text' });
     const el = service.layout().find((e) => e.id === 'header');
     expect(el!.content).toBe('New header text');
   });
 
-  it('updateStyle() sets a style key', () => {
-    service.updateStyle('header', 'fontSize', '24px');
+  it('updateStyle() sets a style key', async () => {
+    await service.updateStyle('header', 'fontSize', '24px');
     const el = service.layout().find((e) => e.id === 'header');
     expect(el!.styles?.fontSize).toBe('24px');
   });
 
-  it('updateStyle() with empty string removes the key', () => {
-    service.updateStyle('header', 'fontSize', '');
-    const el = service.layout().find((e) => e.id === 'header');
-    expect(el!.styles?.fontSize).toBeUndefined();
+  it('updateStyle() with empty string removes the override (default re-applied)', async () => {
+    await service.updateStyle('header', 'fontSize', '24px');
+    expect(service.layout().find((e) => e.id === 'header')!.styles?.fontSize).toBe('24px');
+    await service.updateStyle('header', 'fontSize', '');
+    // The override is removed, so normalize() re-applies the default.
+    const fontSize = service.layout().find((e) => e.id === 'header')!.styles?.fontSize;
+    expect(fontSize).toBeTruthy(); // default value, not '24px'
+    expect(fontSize).not.toBe('24px');
   });
 
-  it('reorder() persists the new order', () => {
+  it('reorder() persists the new order', async () => {
     const original = service.layout();
     const reordered = [original[1], original[0], ...original.slice(2)];
-    service.reorder(reordered);
+    await service.reorder(reordered);
     expect(service.layout()[0].id).toBe('meta');
     expect(service.layout()[1].id).toBe('header');
   });
 
-  it('resetToDefault() restores the 7 default elements', () => {
-    service.addElement('text');
-    service.addElement('image');
+  it('resetToDefault() restores the 7 default elements', async () => {
+    await service.addElement('text');
+    await service.addElement('image');
     expect(service.layout().length).toBe(9);
-    service.resetToDefault();
+    await service.resetToDefault();
     expect(service.layout().length).toBe(7);
   });
 

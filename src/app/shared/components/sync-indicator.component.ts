@@ -2,34 +2,23 @@ import { Component, inject, computed } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { DataProvider } from '../../core/services/data-provider';
 import { IconComponent } from './icon.component';
+import { SpinnerComponent } from './spinner.component';
 
-/**
- * Sync indicator — shows the current sync state in the sidebar footer.
- *
- * Four states:
- *   - local   — anonymous mode, no cloud. "Saved locally" with a disk icon.
- *   - synced  — cloud mode, all writes confirmed. "Saved" with a check.
- *   - syncing — cloud mode, writes pending. "Saving…" with a spinner.
- *   - offline — cloud mode, network unreachable. "Offline" with a cloud-off.
- *
- * The component reads `DataProvider.syncState` directly — the provider
- * aggregates per-collection metadata into a single signal.
- */
 @Component({
   selector: 'app-sync-indicator',
   standalone: true,
-  imports: [TranslatePipe, IconComponent],
+  imports: [TranslatePipe, IconComponent, SpinnerComponent],
   template: `
     <div
       class="sync-indicator"
       [class]="'sync-indicator--' + state()"
       [title]="tooltip()"
     >
-      <app-icon
-        [name]="iconName()"
-        [size]="14"
-        [class.sync-indicator__spin]="state() === 'syncing'"
-      />
+      @if (state() === 'syncing') {
+        <app-spinner [size]="14" />
+      } @else {
+        <app-icon [name]="iconName()" [size]="14" />
+      }
       <span class="sync-indicator__label">{{ labelKey() | translate }}</span>
     </div>
   `,
@@ -61,10 +50,6 @@ import { IconComponent } from './icon.component';
       &__label {
         line-height: 1;
         white-space: nowrap;
-      }
-
-      &__spin {
-        animation: var(--motion-spin);
       }
     }
   `],

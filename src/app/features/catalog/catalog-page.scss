@@ -206,10 +206,10 @@
 
   &__fav {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    width: 32px;
-    height: 32px;
+    top: 8px;
+    left: 8px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid var(--surface-200);
@@ -224,6 +224,10 @@
     &:hover {
       color: var(--warn-500);
       transform: scale(1.1);
+    }
+
+    &:active {
+      transform: scale(0.92);
     }
 
     &--active {

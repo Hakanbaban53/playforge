@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal, effect } from '@angular/core';
 import {
   ConfigurationDraft,
   ConfiguredPart,
@@ -8,11 +8,17 @@ import {
   ResolvedProduct,
 } from '../models/catalog.model';
 import { CatalogService } from './catalog.service';
+import { AuthService } from './auth.service';
 
 /**
  * Part-based configurator with live pricing and reverse catalog matching.
  *
- * The reverse-match algorithm works as follows:
+ * Logout reset: on every logout (driven by `AuthService.logoutEpoch`),
+ * the configurator selection is cleared. Without this, user A's
+ * half-built configuration would still be on screen if user B logged in
+ * on the same device.
+ *
+ * The reverse-match algorithm:
  *
  *   1. When the user loads a variant via `loadFromVariant()`, the
  *      `_loadedVariantId` signal is set. The match suggestion will NOT
@@ -30,6 +36,7 @@ import { CatalogService } from './catalog.service';
 @Injectable({ providedIn: 'root' })
 export class ConfiguratorService {
   private readonly catalog = inject(CatalogService);
+  private readonly auth = inject(AuthService);
 
   private readonly _familyId = signal<string | null>(null);
   readonly familyId = this._familyId.asReadonly();
@@ -37,12 +44,17 @@ export class ConfiguratorService {
   private readonly _selection = signal<Map<string, number>>(new Map());
   readonly selection = this._selection.asReadonly();
 
-  /**
-   * Tracks the variant that was loaded via `loadFromVariant()`.
-   * When non-null, the match suggestion skips this variant — the user
-   * already knows they're on it. Cleared on any manual part toggle.
-   */
   private readonly _loadedVariantId = signal<string | null>(null);
+
+  constructor() {
+    effect(() => {
+      const epoch = this.auth.logoutEpoch();
+      if (epoch === 0) return;
+      this._familyId.set(null);
+      this._loadedVariantId.set(null);
+      this._selection.set(new Map());
+    });
+  }
 
   readonly family = computed<ProductFamily | null>(() => {
     const id = this._familyId();
@@ -150,9 +162,7 @@ export class ConfiguratorService {
     };
   });
 
-  // ---------------------------------------------------------------------------
   // Mutations
-  // ---------------------------------------------------------------------------
 
   /** Switch the active family. Resets selection. */
   setFamily(familyId: string): void {

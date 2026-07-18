@@ -5,18 +5,23 @@ import { Routes } from '@angular/router';
  *
  * Every feature page is lazy-loaded via `loadComponent` so the initial
  * bundle stays small. Each feature component stands alone (no NgModules).
+ *
+ * Page titles use `data.titleKey` (an i18n key) instead of a hardcoded
+ * `title:` string. The TranslatableTitleStrategy reads this key, translates
+ * it, and appends ` · ${appName}`. When the user switches languages, the
+ * tab title re-translates automatically.
  */
 export const routes: Routes = [
   { path: '', redirectTo: 'catalog', pathMatch: 'full' },
   {
     path: 'catalog',
-    title: 'Catalog · PlayForge',
+    data: { titleKey: 'nav.catalog' },
     loadComponent: () =>
       import('./features/catalog/catalog-page').then((m) => m.CatalogPage),
   },
   {
     path: 'configurator',
-    title: 'Configurator · PlayForge',
+    data: { titleKey: 'nav.configurator' },
     loadComponent: () =>
       import('./features/configurator/configurator-page').then(
         (m) => m.ConfiguratorPage,
@@ -24,13 +29,13 @@ export const routes: Routes = [
   },
   {
     path: 'invoice',
-    title: 'Invoice · PlayForge',
+    data: { titleKey: 'nav.invoice' },
     loadComponent: () =>
       import('./features/invoice/invoice-page').then((m) => m.InvoicePage),
   },
   {
     path: 'receipt-editor',
-    title: 'Receipt Editor · PlayForge',
+    data: { titleKey: 'nav.receiptEditor' },
     loadComponent: () =>
       import('./features/receipt-editor/receipt-editor-page').then(
         (m) => m.ReceiptEditorPage,
@@ -38,19 +43,19 @@ export const routes: Routes = [
   },
   {
     path: 'import',
-    title: 'Excel Import · PlayForge',
+    data: { titleKey: 'nav.import' },
     loadComponent: () =>
       import('./features/import/import-page').then((m) => m.ImportPage),
   },
   {
     path: 'export',
-    title: 'Export · PlayForge',
+    data: { titleKey: 'nav.export' },
     loadComponent: () =>
       import('./features/export/export-page').then((m) => m.ExportPage),
   },
   {
     path: 'catalog-management',
-    title: 'Catalog Management · PlayForge',
+    data: { titleKey: 'nav.catalogManagement' },
     loadComponent: () =>
       import('./features/catalog-management/catalog-management-page').then(
         (m) => m.CatalogManagementPage,
@@ -58,19 +63,19 @@ export const routes: Routes = [
   },
   {
     path: 'customers',
-    title: 'Customers · PlayForge',
+    data: { titleKey: 'nav.customers' },
     loadComponent: () =>
       import('./features/customers/customers-page').then((m) => m.CustomersPage),
   },
   {
     path: 'settings',
-    title: 'Settings · PlayForge',
+    data: { titleKey: 'nav.settings' },
     loadComponent: () =>
       import('./features/settings/settings-page').then((m) => m.SettingsPage),
   },
   {
     path: 'oauth-callback',
-    title: 'Authentication · PlayForge',
+    data: { titleKey: 'auth.account' },
     loadComponent: () =>
       import('./features/oauth-callback/oauth-callback').then((m) => m.OAuthCallbackPage),
   },

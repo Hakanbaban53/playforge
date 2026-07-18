@@ -274,15 +274,15 @@
 
   &__remove {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 18px;
-    height: 18px;
+    top: -10px;
+    right: -10px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: var(--danger-500);
     color: #fff;
     border: 1.5px solid var(--surface-0);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
@@ -292,6 +292,10 @@
 
     &:hover {
       background: var(--danger-700);
+    }
+
+    &:active {
+      transform: scale(0.92);
     }
   }
 }

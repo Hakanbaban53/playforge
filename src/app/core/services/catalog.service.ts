@@ -69,9 +69,7 @@ export class CatalogService {
     await Promise.all(urls.map((url) => this.uploadService.delete(url)));
   }
 
-  // ---------------------------------------------------------------------------
   // Family CRUD
-  // ---------------------------------------------------------------------------
 
   async addFamily(family: Omit<ProductFamily, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductFamily> {
     const now = Date.now();
@@ -121,9 +119,7 @@ export class CatalogService {
     await Promise.all(variants.map((v) => this.data.removeRecord(Collections.catalogVariants, v.id)));
   }
 
-  // ---------------------------------------------------------------------------
   // Variant CRUD
-  // ---------------------------------------------------------------------------
 
   async addVariant(variant: Omit<ProductVariant, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductVariant> {
     const now = Date.now();
@@ -172,11 +168,7 @@ export class CatalogService {
     }
     await this.data.removeRecord(Collections.catalogVariants, id);
   }
-
-
-  // ---------------------------------------------------------------------------
   // Resolution: variant -> ResolvedProduct
-  // ---------------------------------------------------------------------------
 
   /** Resolve a single variant into a flat `ResolvedProduct`. */
   resolve(variantId: string): ResolvedProduct | null {

@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, HostListener, ElementRef, AfterViewInit, DestroyRef } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from './icon.component';
+import { SpinnerComponent } from './spinner.component';
 
 /**
  * Compact auth widget for the sidebar footer.
@@ -13,12 +14,13 @@ import { IconComponent } from './icon.component';
  *      Shows a "Sign in" pill button. Clicking triggers Google OAuth.
  *   3. Signed in:
  *      Shows the user's avatar (or initials fallback) + name. Clicking
- *      opens a small menu with a "Sign out" action.
+ *      opens a small menu with a "Sign out" action. The menu closes on
+ *      click-outside, Escape, or sign-out.
  */
 @Component({
   selector: 'app-auth-widget',
   standalone: true,
-  imports: [TranslatePipe, IconComponent],
+  imports: [TranslatePipe, IconComponent, SpinnerComponent],
   template: `
     @if (cloudEnabled) {
       @if (user(); as u) {
@@ -67,7 +69,7 @@ import { IconComponent } from './icon.component';
           [attr.aria-label]="'auth.signIn' | translate"
         >
           @if (signingIn()) {
-            <app-icon name="progress_activity" [size]="14" [class.auth-widget__spin]="true" />
+            <app-spinner [size]="14" />
             <span>{{ 'auth.signingIn' | translate }}</span>
           } @else {
             <span class="auth-widget__google-g" aria-hidden="true">G</span>
@@ -146,10 +148,6 @@ import { IconComponent } from './icon.component';
         place-items: center;
         flex-shrink: 0;
       }
-
-      &__spin {
-        animation: var(--motion-spin);
-      }
     }
 
     .auth-menu {
@@ -207,8 +205,10 @@ import { IconComponent } from './icon.component';
     }
   `],
 })
-export class AuthWidgetComponent {
+export class AuthWidgetComponent implements AfterViewInit {
   private readonly auth = inject(AuthService);
+  private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly cloudEnabled = this.auth.cloudEnabled;
   readonly user = this.auth.user;
@@ -216,6 +216,24 @@ export class AuthWidgetComponent {
 
   private readonly _menuOpen = signal(false);
   readonly menuOpen = this._menuOpen.asReadonly();
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this._menuOpen()) return;
+    const target = event.target as Node | null;
+    const host: HTMLElement = this.elementRef.nativeElement;
+    if (target && host.contains(target)) return;
+    this._menuOpen.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this._menuOpen()) this._menuOpen.set(false);
+  }
+
+  ngAfterViewInit(): void {
+    this.destroyRef.onDestroy(() => this._menuOpen.set(false));
+  }
 
   toggleMenu(): void {
     this._menuOpen.update((v) => !v);

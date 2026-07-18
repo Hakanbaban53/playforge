@@ -109,7 +109,7 @@
                 [disabled]="isUploading()"
                 (change)="onImageUpload($event)"
               />
-              @if (isUploading()) { <span class="muted small">{{ 'common.loading' | translate }}</span> }
+              @if (isUploading()) { <app-spinner [size]="14" /> <span class="muted small">{{ 'common.loading' | translate }}</span> }
             </label>
             @if (uploadError()) {
               <div class="alert alert--error">{{ uploadError() }}</div>

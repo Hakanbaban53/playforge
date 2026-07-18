@@ -4,6 +4,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService } from '@ngx-translate/core';
 import { ExcelImportService } from './excel-import.service';
 import { CatalogService } from './catalog.service';
+import { provideInMemoryDataAndStubAuth } from './testing';
 import * as XLSX from 'xlsx';
 
 /**
@@ -17,19 +18,20 @@ import * as XLSX from 'xlsx';
 describe('ExcelImportService', () => {
   let service: ExcelImportService;
   let catalog: CatalogService;
-  
 
-  beforeEach(() => {
+
+  beforeEach(async () => {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService({}),
+        ...provideInMemoryDataAndStubAuth(),
       ],
     });
     service = TestBed.inject(ExcelImportService);
     catalog = TestBed.inject(CatalogService);
-    catalog.clearAll();
+    await catalog.clearAll();
   });
 
   it('generates a valid .xlsx template', () => {
@@ -160,7 +162,7 @@ describe('ExcelImportService', () => {
     const result = await service.importFromFile(file);
     expect(result.valid.length).toBe(2);
 
-    const summary = service.applyDrafts(result.valid);
+    const summary = await service.applyDrafts(result.valid);
     expect(summary.families).toBe(2);
     expect(summary.variants).toBe(2);
 

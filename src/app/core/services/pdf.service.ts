@@ -48,18 +48,16 @@ export class PdfService {
     const layout = this.receiptLayout.layout();
     const paperSize = invoice.meta.paperSize;
 
-    // 1. Build the full HTML.
     const fullHtml = this.htmlBuilder.build(invoice, layout);
 
-    // 2. Pre-inline ALL images to data URIs BEFORE inserting into DOM.
-    //    This is critical: if we insert the HTML first, the browser tries
-    //    to load `fbstorage://` and Firebase download URLs immediately,
-    //    causing ERR_UNKNOWN_URL_SCHEME and CORS errors. By replacing
-    //    all image srcs with data URIs in the HTML string first, the
-    //    browser never attempts to load the original URLs.
+    // Pre-inline ALL images to data URIs BEFORE inserting into DOM.
+    // This is critical: if we insert the HTML first, the browser tries
+    // to load `fbstorage://` and Firebase download URLs immediately,
+    // causing ERR_UNKNOWN_URL_SCHEME and CORS errors. By replacing
+    // all image srcs with data URIs in the HTML string first, the
+    // browser never attempts to load the original URLs.
     const inlinedHtml = await this.inlineImageSrcsInHtml(fullHtml);
 
-    // 3. Render off-DOM to extract element HTML.
     const tempContainer = document.createElement('div');
     tempContainer.style.position = 'fixed';
     tempContainer.style.left = '-99999px';
@@ -70,17 +68,14 @@ export class PdfService {
     document.body.appendChild(tempContainer);
 
     try {
-      // 4. Extract the <style> block and individual element nodes.
       const styleBlock = tempContainer.querySelector('style')?.outerHTML ?? '';
       const sheet = tempContainer.querySelector('.sheet') ?? tempContainer;
       const elementNodes = Array.from(sheet.children).filter(
         (n) => n.tagName.toLowerCase() !== 'style',
       );
 
-      // 5. Group elements into pages based on measured heights.
       const pages = this.groupIntoPages(elementNodes);
 
-      // 6. Create the PDF.
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'pt',
@@ -93,9 +88,7 @@ export class PdfService {
       for (let i = 0; i < pages.length; i++) {
         if (i > 0) pdf.addPage();
 
-        // Build a fresh container with just this page's elements.
-        // The outerHTML already contains data URIs (from step 2), so
-        // no further image resolution is needed here.
+        // outerHTML already contains data URIs from the inlining step above.
         const pageContainer = document.createElement('div');
         pageContainer.style.position = 'fixed';
         pageContainer.style.left = '-99999px';
@@ -106,7 +99,6 @@ export class PdfService {
         document.body.appendChild(pageContainer);
 
         try {
-          // Wait for all images in this page to finish loading.
           await this.waitForImages(pageContainer);
 
           const canvas = await html2canvas(pageContainer, {
@@ -118,7 +110,6 @@ export class PdfService {
             windowHeight: pageContainer.scrollHeight,
           });
 
-          // Add canvas to the PDF page, scaled to fit the page width.
           const imgWidth = pageWidth;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
           const imgData = canvas.toDataURL('image/jpeg', 0.92);
@@ -128,7 +119,6 @@ export class PdfService {
         }
       }
 
-      // 7. Download & Open.
       const isTauri = typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
       if (isTauri) {
         try {
@@ -140,17 +130,18 @@ export class PdfService {
           const arrayBuffer = pdf.output('arraybuffer');
           const uint8Array = new Uint8Array(arrayBuffer);
 
-          // Save to user's public Downloads directory
           await writeFile(cleanFileName, uint8Array, { baseDir: BaseDirectory.Download });
 
-          // Automatically open with device's default PDF viewer
           try {
             const dir = await downloadDir();
             const normalizedDir = dir.endsWith('/') ? dir.slice(0, -1) : dir;
             const fullPath = `${normalizedDir}/${cleanFileName}`;
-            
-            const androidAuth = (window as any).AndroidAuth;
-            if (androidAuth && typeof androidAuth.openPdf === 'function') {
+
+            interface AndroidPdfBridge {
+              AndroidAuth?: { openPdf?(path: string): void };
+            }
+            const androidAuth = (window as unknown as AndroidPdfBridge).AndroidAuth;
+            if (androidAuth?.openPdf) {
               androidAuth.openPdf(fullPath);
             } else {
               await openPath(fullPath);

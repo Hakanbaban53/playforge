@@ -14,7 +14,7 @@ export default tseslint.config(
   },
   {
     files: ["src/**/*.ts"],
-    ignores: ["src/**/*.spec.ts"],
+    ignores: ["src/**/*.spec.ts", "src/app/core/services/testing.ts"],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommendedTypeChecked,
@@ -47,9 +47,9 @@ export default tseslint.config(
       "@angular-eslint/use-lifecycle-interface": "error",
     },
   },
-  // Non-type-checked config for spec files.
+  // Non-type-checked config for spec files and test utilities.
   {
-    files: ["src/**/*.spec.ts"],
+    files: ["src/**/*.spec.ts", "src/app/core/services/testing.ts"],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommended,

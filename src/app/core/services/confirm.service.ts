@@ -185,8 +185,8 @@ export class ConfirmService {
         transform: translateY(1px);
       }
       .app-confirm__btn:focus-visible {
-        outline: 2px solid var(--brand-500);
-        outline-offset: 2px;
+        outline: none;
+        box-shadow: 0 0 0 3px var(--brand-focus-ring);
       }
       .app-confirm__btn--cancel {
         background: var(--surface-0);

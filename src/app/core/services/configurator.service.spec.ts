@@ -4,6 +4,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideTranslateService } from '@ngx-translate/core';
 import { CatalogService } from './catalog.service';
 import { ConfiguratorService } from './configurator.service';
+import { provideInMemoryDataAndStubAuth } from './testing';
 import {
   Part,
   ProductFamily,
@@ -31,12 +32,13 @@ describe('ConfiguratorService', () => {
   const PART_MAT = 'pt-mat';
   const PART_ROOF = 'pt-roof';
 
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService({}),
+        ...provideInMemoryDataAndStubAuth(),
       ],
     });
     catalog = TestBed.inject(CatalogService);
@@ -76,7 +78,7 @@ describe('ConfiguratorService', () => {
         createdAt: Date.now(), updatedAt: Date.now(),
       },
     ];
-    catalog.replaceAll([family], variants);
+    await catalog.replaceAll([family], variants);
   });
 
   it('seeds the synthetic family', () => {

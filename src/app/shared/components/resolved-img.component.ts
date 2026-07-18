@@ -1,17 +1,24 @@
-import { Component, input, inject, signal, effect, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, inject, signal, effect, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
 import { NgStyle } from '@angular/common';
 import { ImageResolverService } from '../../core/services/image-resolver.service';
+import { AuthService } from '../../core/services/auth.service';
 
 /**
- * Renders an <img> whose src is resolved from an idb:// (or other)
- * reference via ImageResolverService. Resolves asynchronously and updates
- * the rendered src once the blob URL is ready.
+ * Renders an <img> whose src is resolved from an `idb://` or
+ * `fbstorage://` reference via `ImageResolverService`. Resolves
+ * asynchronously and updates the rendered src once the URL is ready.
  *
- * Why a component instead of a pipe? Pure pipes can't re-run after async
- * resolution under zoneless CD. A component with a signal-backed src
- * re-renders when the signal updates.
- *
- * Pass a styles record to apply CSS properties to the inner <img>.
+ * Lifecycle safety:
+ *   - The async `resolve()` call is tracked per `src` change. If the
+ *     component is destroyed before resolution completes (route change,
+ *     logout, etc.), the result is dropped — we check `destroyed` before
+ *     writing to `resolvedSrc`.
+ *   - If a new `src` arrives while an old resolution is still in flight,
+ *     the old result is dropped (we track the latest `src` value and
+ *     only apply results matching it).
+ *   - `fbstorage://` refs are NOT resolved when the user is
+ *     unauthenticated — `ImageResolverService.resolve()` returns ''
+ *     immediately in that case, avoiding a doomed 403 from Storage.
  */
 @Component({
   selector: 'app-resolved-img',
@@ -31,24 +38,37 @@ import { ImageResolverService } from '../../core/services/image-resolver.service
 })
 export class ResolvedImgComponent {
   private readonly resolver = inject(ImageResolverService);
+  private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  /** Source URL reference — `idb://...`, `http(s)://...`, `data:...`, `blob:...`. */
   readonly src = input<string | undefined | null>(undefined);
   readonly alt = input<string>('');
   readonly imgClass = input<string>('');
-  /** CSS style object applied directly to the inner `<img>` via ngStyle. */
   readonly styles = input<Record<string, string>>({});
 
-  /** Resolved URL — empty string until async resolution completes. */
   readonly resolvedSrc = signal<string>('');
 
+  private destroyed = false;
+
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+    });
+
     effect(() => {
       const url = this.src();
+      const authed = this.auth.isAuthenticated();
+
       if (!url) {
         this.resolvedSrc.set('');
         return;
       }
+
+      if (!authed && url.startsWith('fbstorage://')) {
+        this.resolvedSrc.set('');
+        return;
+      }
+
       const cached = this.resolver.getCached(url);
       if (cached) {
         this.resolvedSrc.set(cached);
@@ -59,10 +79,21 @@ export class ResolvedImgComponent {
         return;
       }
       this.resolvedSrc.set('');
-      this.resolver.resolve(url).then(
-        (resolved) => this.resolvedSrc.set(resolved),
-        (err) => console.warn('[ResolvedImg] failed to resolve', url, err),
-      );
+
+      const targetUrl = url;
+      this.resolver
+        .resolve(url)
+        .then((resolved) => {
+          if (this.destroyed) return;
+          if (this.src() !== targetUrl) return;
+          this.resolvedSrc.set(resolved);
+        })
+        .catch((err) => {
+          if (this.destroyed) return;
+          const code = (err as { code?: string }).code ?? '';
+          if (code === 'storage/unauthorized' || code === 'storage/object-not-found') return;
+          console.warn('[ResolvedImg] failed to resolve', url, err);
+        });
     });
   }
 }

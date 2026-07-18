@@ -13,6 +13,7 @@ import {
 } from '../../core/models/catalog.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
+import { SpinnerComponent } from '../../shared/components/spinner.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 type DraftMode = 'none' | 'family' | 'variant' | 'part';
@@ -30,7 +31,7 @@ type DraftMode = 'none' | 'family' | 'variant' | 'part';
 @Component({
   selector: 'app-catalog-management-page',
   standalone: true,
-  imports: [IconComponent, ButtonComponent, MoneyPipe, TranslatePipe],
+  imports: [IconComponent, ButtonComponent, SpinnerComponent, MoneyPipe, TranslatePipe],
   templateUrl: './catalog-management-page.html',
   styleUrl: './catalog-management-page.scss',
 })
@@ -106,16 +107,10 @@ export class CatalogManagementPage {
   readonly leavingVariantIds = signal<ReadonlySet<string>>(new Set());
   readonly leavingPartIds = signal<ReadonlySet<string>>(new Set());
   readonly leavingFamilyIds = signal<ReadonlySet<string>>(new Set());
-
-  // ---- Selection ----
-
   selectFamily(id: string): void {
     this.selectedFamilyId.set(id);
     this.cancelDraft();
   }
-
-  // ---- Family CRUD ----
-
   startAddFamily(): void {
     this.draftMode.set('family');
     this.editingId.set(null);
@@ -206,9 +201,6 @@ export class CatalogManagementPage {
       });
     }, 200);
   }
-
-  // ---- Variant CRUD ----
-
   startAddVariant(): void {
     if (!this.selectedFamilyId()) return;
     this.draftMode.set('variant');
@@ -281,9 +273,6 @@ export class CatalogManagementPage {
       });
     }, 200);
   }
-
-  // ---- Part CRUD ----
-
   startAddPart(): void {
     if (!this.selectedFamilyId()) return;
     this.draftMode.set('part');
@@ -364,9 +353,6 @@ export class CatalogManagementPage {
       });
     }, 200);
   }
-
-  // ---- Helpers ----
-
   cancelDraft(): void {
     this.draftMode.set('none');
     this.editingId.set(null);

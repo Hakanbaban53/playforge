@@ -1,6 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, effect } from '@angular/core';
 import { FileStorageAdapter, StoredFile, parseStoredFileRef } from './file-storage.adapter';
 import { FirebaseStorageService, parseFirebaseStorageRef } from './firebase-storage.service';
+import { AuthService } from './auth.service';
 
 /**
  * Resolves image URL references to real, browser-usable URLs.
@@ -12,42 +13,57 @@ import { FirebaseStorageService, parseFirebaseStorageRef } from './firebase-stor
  *   - `data:`/`blob:`        → returned as-is
  *   - `asset://`             → returned as-is (Tauri mode)
  *
- * Resolution is async and cached per-reference for the page lifetime.
- * Firebase Storage download URLs contain a token that expires (~1 hour),
- * but the cache is best-effort — if a cached URL expires, the browser
- * shows a broken image and the next resolve call refreshes it.
+ * Cache invalidation:
+ *   - The in-memory URL cache is cleared on every logout (driven by
+ *     `AuthService.logoutEpoch`). This prevents a stale cached URL
+ *     from one user's session from being reused after a different user
+ *     logs in on the same device.
+ *   - Firebase Storage download URLs contain a token that expires
+ *     (~1 hour). If a cached URL expires, the browser shows a broken
+ *     image and the next resolve call refreshes it.
  *
- * For PDF generation (where `fetch()` hits CORS on Firebase Storage
- * download URLs), use `resolveToDataUri()` instead — it downloads bytes
- * via the Firebase SDK for `fbstorage://` refs, bypassing CORS entirely.
+ * Auth gating:
+ *   - `fbstorage://` refs are only resolved when the user is
+ *     authenticated. If auth state is already "logged out" when
+ *     `resolve()` is called, we return '' instead of attempting a
+ *     doomed request that would 403.
+ *
+ * For PDF generation, use `resolveToDataUri()` — it downloads bytes
+ * via the Firebase SDK for `fbstorage://` refs, bypassing CORS.
  */
 @Injectable({ providedIn: 'root' })
 export class ImageResolverService {
   private readonly storage: FileStorageAdapter;
   private readonly fbStorage = inject(FirebaseStorageService);
+  private readonly auth = inject(AuthService);
 
-  /** Allow explicit adapter injection (used by tests). */
   constructor(storage?: FileStorageAdapter) {
     this.storage = storage ?? inject(FileStorageAdapter);
+
+    effect(() => {
+      const epoch = this.auth.logoutEpoch();
+      if (epoch === 0) return;
+      this.clearCache();
+    });
   }
 
-  /** ref → resolved URL (cached for page lifetime). */
-  private readonly cache = new Map<string, string>();
+  /** ref → resolved URL. */
+  private cache = new Map<string, string>();
   /** ref → in-flight promise (dedupes concurrent resolutions). */
-  private readonly inflight = new Map<string, Promise<string>>();
+  private inflight = new Map<string, Promise<string>>();
   /** ref → data URI (cached for PDF generation). */
-  private readonly dataUriCache = new Map<string, string>();
+  private dataUriCache = new Map<string, string>();
 
   /**
    * Resolve an image URL reference to a real, browser-usable URL.
-   * Accepts `idb://`, `fbstorage://`, or standard URLs (returned as-is).
    */
   async resolve(url: string | undefined | null): Promise<string> {
     if (!url) return '';
 
-    // Check if it's a Firebase Storage reference.
     const fbRef = parseFirebaseStorageRef(url);
     if (fbRef) {
+      if (!this.auth.isAuthenticated()) return '';
+
       const cached = this.cache.get(url);
       if (cached) return cached;
 
@@ -55,20 +71,27 @@ export class ImageResolverService {
       if (existing) return existing;
 
       const promise = (async () => {
-        const resolved = await this.fbStorage.resolveUrl(url);
-        this.cache.set(url, resolved);
-        this.inflight.delete(url);
-        return resolved;
+        try {
+          const resolved = await this.fbStorage.resolveUrl(url);
+          this.cache.set(url, resolved);
+          return resolved;
+        } catch (err) {
+          const code = (err as { code?: string }).code ?? '';
+          if (code !== 'storage/unauthorized' && code !== 'storage/object-not-found') {
+            console.warn('[ImageResolver] fbstorage resolve failed for', url, err);
+          }
+          return '';
+        } finally {
+          this.inflight.delete(url);
+        }
       })();
 
       this.inflight.set(url, promise);
       return promise;
     }
 
-    // Check if it's an IndexedDB reference.
     const idbRef = parseStoredFileRef(url);
     if (!idbRef) {
-      // Not a stored reference — return as-is (http, https, data, blob, etc.)
       return url;
     }
 
@@ -87,7 +110,6 @@ export class ImageResolverService {
       };
       const resolved = await this.storage.resolveUrl(stored);
       this.cache.set(url, resolved);
-      this.inflight.delete(url);
       return resolved;
     })();
 
@@ -97,31 +119,22 @@ export class ImageResolverService {
 
   /**
    * Resolve an image reference to a data URI (base64-encoded).
-   *
-   * This is used by PdfService for inlining images into the PDF canvas.
-   * For `fbstorage://` refs, it downloads bytes via the Firebase SDK
-   * (`getBytes`) — this bypasses CORS entirely, unlike `fetch()` on the
-   * download URL. For `idb://` refs, it reads bytes from IndexedDB.
-   * For standard URLs, it falls back to `fetch()`.
-   *
-   * Results are cached per-ref for the page lifetime.
+   * Used by PdfService for inlining images into the PDF canvas.
    */
   async resolveToDataUri(url: string | undefined | null): Promise<string> {
     if (!url) return '';
 
-    // Check cache first.
     const cached = this.dataUriCache.get(url);
     if (cached) return cached;
 
-    // If it's already a data URI, return as-is.
     if (url.startsWith('data:')) {
       this.dataUriCache.set(url, url);
       return url;
     }
 
-    // Firebase Storage ref — download bytes via SDK (no CORS).
     const fbRef = parseFirebaseStorageRef(url);
     if (fbRef) {
+      if (!this.auth.isAuthenticated()) return '';
       const bytes = await this.fbStorage.getBytes(url);
       if (bytes) {
         const dataUri = this.arrayBufferToDataUri(bytes, this.guessMimeType(url));
@@ -131,7 +144,6 @@ export class ImageResolverService {
       return '';
     }
 
-    // IndexedDB ref — read bytes from IDB.
     const idbRef = parseStoredFileRef(url);
     if (idbRef) {
       const stored: StoredFile = { id: idbRef.id, name: '', mimeType: '', size: 0 };
@@ -144,9 +156,6 @@ export class ImageResolverService {
       return '';
     }
 
-    // Standard URL — fall back to fetch(). This may hit CORS for
-    // cross-origin images, but that's the best we can do without the
-    // Firebase SDK. The caller should handle failures gracefully.
     try {
       const res = await fetch(url, { mode: 'cors' });
       if (!res.ok) return '';
@@ -159,7 +168,6 @@ export class ImageResolverService {
     }
   }
 
-  /** Convert an ArrayBuffer to a base64 data URI. */
   private arrayBufferToDataUri(buffer: ArrayBuffer, mimeType: string): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
@@ -170,7 +178,6 @@ export class ImageResolverService {
     return `data:${mimeType};base64,${base64}`;
   }
 
-  /** Guess MIME type from URL extension. */
   private guessMimeType(url: string): string {
     const ext = url.split('.').pop()?.toLowerCase().split('?')[0] ?? '';
     switch (ext) {
@@ -184,7 +191,6 @@ export class ImageResolverService {
     }
   }
 
-  /** Convert a Blob to a data URI. */
   private blobToDataUri(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -194,10 +200,7 @@ export class ImageResolverService {
     });
   }
 
-  /**
-   * Synchronously check whether a reference has already been resolved.
-   * Returns the cached URL or empty string.
-   */
+  /** Synchronously check whether a reference has already been resolved. */
   getCached(url: string | undefined | null): string {
     if (!url) return '';
     return this.cache.get(url) ?? '';
@@ -212,5 +215,11 @@ export class ImageResolverService {
   isStoredRef(url: string | undefined | null): boolean {
     if (!url) return false;
     return parseStoredFileRef(url) !== null || parseFirebaseStorageRef(url) !== null;
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+    this.dataUriCache.clear();
+    this.inflight.clear();
   }
 }

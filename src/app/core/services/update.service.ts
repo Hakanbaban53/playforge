@@ -89,7 +89,6 @@ export class UpdateService {
     try {
       const { listen } = await import('@tauri-apps/api/event');
       await listen<UpdateInfo>('update-available', (event) => {
-        console.info('[Update] Update event received from backend:', event.payload);
         this.updateAvailable.set(event.payload);
       });
     } catch (err) {

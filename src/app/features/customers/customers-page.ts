@@ -62,7 +62,6 @@ export class CustomersPage {
 
   readonly isEmpty = computed(() => this.customers().length === 0);
 
-  /** Total amount for a saved invoice, formatted in its currency. */
   savedInvoiceTotal(inv: Invoice): number {
     return inv.lines.reduce((sum, l) => sum + lineTotal(l), 0);
   }
@@ -71,9 +70,6 @@ export class CustomersPage {
   savedInvoiceCustomer(inv: Invoice): string {
     return inv.meta.customerName || this.i18n.t('customers.noInvoices');
   }
-
-  // ---- Form actions ----
-
   startCreate(): void {
     this.editingId.set(null);
     this.isCreating.set(true);
@@ -154,9 +150,6 @@ export class CustomersPage {
     this.toast.success('toast.saved');
     void this.router.navigate(['/invoice']);
   }
-
-  // ---- Saved-invoice actions ----
-
   /** Clone a saved invoice back into the active editor. */
   async cloneToEditor(inv: Invoice): Promise<void> {
     await this.invoiceSvc.loadSaved(inv);
@@ -178,9 +171,6 @@ export class CustomersPage {
     }, 200);
     this.toast.info('toast.deleted');
   }
-
-  // ---- Form input helpers ----
-
   onInput(target: 'name' | 'taxId' | 'email' | 'phone' | 'address' | 'notes', event: Event): void {
     const v = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
     switch (target) {

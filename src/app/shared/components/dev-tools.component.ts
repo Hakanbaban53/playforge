@@ -8,39 +8,6 @@ import { InvoiceService } from '../../core/services/invoice.service';
 import { FavoritesService } from '../../core/services/favorites.service';
 import { IconComponent } from './icon.component';
 
-/**
- * Dev-mode mock data panel.
- *
- * Renders ONLY when `!environment.production`. Mounted once at the app
- * shell level (`app.html`), so it floats above every route.
- *
- * UX:
- *   - Collapsed: small floating pill in the bottom-right corner with a
- *     science/beaker icon and "DEV" label.
- *   - Expanded: card with live entity counts, one-click seed buttons per
- *     entity, a "Seed all" orchestrator, and a "Wipe all data" danger
- *     action.
- *
- * The seed buttons call `MockDataService` and then surface a toast so the
- * user gets feedback that the injection happened (and how many records
- * were added).
- *
- * Theme:
- *   - Uses design tokens (var(--surface-0), var(--brand-500), etc.) so the
- *     panel automatically picks up light/dark mode.
- *   - The danger action uses the danger palette so it's visually distinct.
- *
- * Accessibility:
- *   - The collapsed pill is a `<button>` with aria-label.
- *   - The expanded panel has role="dialog" and aria-label.
- *   - Close button has aria-label.
- *
- * Why a separate component (not embedded in settings)?
- *   - Devs need it available on every page without navigating anywhere.
- *   - Floating keeps it out of the way of normal UX testing.
- *   - It's tree-shaken out of production builds because the host element
- *     is wrapped in `@if (!environment.production)`.
- */
 @Component({
   selector: 'app-dev-tools',
   standalone: true,
@@ -164,10 +131,8 @@ import { IconComponent } from './icon.component';
       right: 16px;
       z-index: 9500;
       pointer-events: none;
-      /* Container itself doesn't capture clicks; children re-enable. */
     }
 
-    /* ====================== Collapsed pill ====================== */
     .dev-pill {
       pointer-events: auto;
       display: inline-flex;
@@ -214,7 +179,6 @@ import { IconComponent } from './icon.component';
       }
     }
 
-    /* ====================== Expanded panel ====================== */
     .dev-panel {
       pointer-events: auto;
       width: 320px;
@@ -230,10 +194,6 @@ import { IconComponent } from './icon.component';
       transform-origin: bottom right;
     }
 
-    /* Enter + exit are declared as separate classes (not the global
-       anim-scale-in utility) so we can pair them with the leaving
-       signal without the global class clobbering the exit animation.
-       Same curve as scale-in / scale-out — decelerate in, accelerate out. */
     .dev-panel--enter {
       animation: scale-in var(--motion-base) var(--ease-decelerate) both;
     }
@@ -287,7 +247,6 @@ import { IconComponent } from './icon.component';
       }
     }
 
-    /* ====================== Counts row ====================== */
     .dev-counts {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -322,7 +281,6 @@ import { IconComponent } from './icon.component';
       }
     }
 
-    /* ====================== Action buttons ====================== */
     .dev-actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -406,7 +364,6 @@ import { IconComponent } from './icon.component';
       text-align: center;
     }
 
-    /* Mobile: pull the panel up off the bottom edge and shrink width */
     @media (max-width: 480px) {
       :host {
         bottom: 12px;
@@ -427,26 +384,18 @@ export class DevToolsComponent {
   private readonly invoice = inject(InvoiceService);
   private readonly favorites = inject(FavoritesService);
 
-  /** True in production builds — the entire template no-ops. */
   readonly isProduction = !isDevMode();
 
-  /** Panel open/closed state. Persisted to localStorage so it survives reloads. */
   readonly open = signal(this.loadOpenState());
 
-  /** True for ~200ms after the user closes the panel — keeps the panel
-   *  in the DOM so the exit animation can play before `@if` removes it. */
   readonly leaving = signal(false);
 
-  /** True while a seed/wipe operation is in flight (disables buttons). */
   readonly busy = signal(false);
 
-  /** Live entity counts — re-computed whenever any underlying signal changes. */
   readonly counts = computed(() => {
-    // Touch each signal so this computed re-evaluates on changes.
     const families = this.catalog.families().length;
     const variants = this.catalog.variants().length;
     const customers = this.customersSvc.customers().length;
-    // listSaved() reads savedVersion() internally, so this re-evaluates on save/delete.
     const invoices = this.invoice.listSaved().length;
     const favorites = this.favorites.count();
 
@@ -454,7 +403,6 @@ export class DevToolsComponent {
   });
 
   constructor() {
-    // Persist open state across reloads.
     effect(() => {
       try {
         localStorage.setItem('pgpos:dev-tools:open', JSON.stringify(this.open()));
@@ -464,17 +412,12 @@ export class DevToolsComponent {
     });
   }
 
-  /**
-   * The :host container never captures clicks — only its children do.
-   * This lets clicks pass through the empty space around the floating panel.
-   */
+
   @HostBinding('style.pointer-events')
   readonly hostPointerEvents = 'none';
 
   toggle(): void {
     if (this.open()) {
-      // Two-phase close: mark leaving so the CSS exit animation plays,
-      // then actually close after the animation duration.
       this.leaving.set(true);
       window.setTimeout(() => {
         this.open.set(false);
@@ -484,10 +427,6 @@ export class DevToolsComponent {
       this.open.set(true);
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Seed actions — each surfaces a toast with the count.
-  // ---------------------------------------------------------------------------
 
   async seedCatalog(): Promise<void> {
     this.busy.set(true);
@@ -572,9 +511,6 @@ export class DevToolsComponent {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Internals
-  // ---------------------------------------------------------------------------
 
   private loadOpenState(): boolean {
     try {

@@ -51,28 +51,19 @@ export class InvoicePage {
   readonly pdfError = signal<string | null>(null);
   readonly lastPageCount = signal<number | null>(null);
 
-  /** IDs of line items / tax items currently playing their exit animation.
-   *  The @for keeps them in the DOM until the animation finishes, then the
-   *  underlying service actually removes them. */
   readonly leavingLineIds = signal<ReadonlySet<string>>(new Set());
   readonly leavingTaxIds = signal<ReadonlySet<string>>(new Set());
 
-  /** Per-line total helper. */
   lineTotal = lineTotal;
 
-  /** Tax amount for a single tax line. */
   taxAmount(tax: { type: 'percent' | 'fixed'; value: number }): number {
     return computeTaxAmount(tax, this.subtotal());
   }
 
-  /** Navigate to the receipt layout editor. */
   openReceiptEditor(): void {
     void this.router.navigate(['/receipt-editor']);
   }
 
-  // ---------------------------------------------------------------------------
-  // Meta + line mutations
-  // ---------------------------------------------------------------------------
 
   updateMeta(event: Event, key: keyof InvoiceMeta): void {
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
@@ -176,9 +167,6 @@ export class InvoicePage {
     this.toast.success('toast.convertedToInvoice');
   }
 
-  // ---------------------------------------------------------------------------
-  // PDF export
-  // ---------------------------------------------------------------------------
 
   async downloadPdf(): Promise<void> {
     this.isGeneratingPdf.set(true);

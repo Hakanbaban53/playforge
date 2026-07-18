@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed, DestroyRef } from '@angular/core';
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -12,19 +12,34 @@ import {
 import { FirebaseService } from './firebase.service';
 import { environment } from '../../../environments/environment';
 
-/**
- * Authenticated user shape — a thin projection of `firebase.User` so the
- * rest of the app doesn't have to import the Firebase SDK directly.
- */
-export interface AppUser {
-  readonly uid: string;
-  readonly email: string | null;
-  readonly displayName: string | null;
-  readonly photoURL: string | null;
-  /** True for ~3s after sign-in completes — used by the merge flow to
-   *  decide whether to prompt the user about uploading local data. */
-  readonly justSignedIn: boolean;
+/** Classified OAuth error codes — maps Firebase Auth error codes to
+ *  user-friendly message keys consumed by the OAuth callback page. */
+export type OAuthErrorKind =
+  | 'expired'
+  | 'denied'
+  | 'network'
+  | 'config'
+  | 'default';
+
+export interface OAuthCallbackResult {
+  idToken: string;
+  user: AppUser;
 }
+
+/**
+ * Reason a session ended. Used by downstream services to decide whether
+ * to surface a "session expired" toast (vs. a user-initiated sign-out,
+ * which is silent).
+ *
+ *   - `explicit`    — user clicked "Sign out" in this tab.
+ *   - `expired`     — Firebase reported a null user after previously
+ *                     having one (token revoked, expired, or revoked by
+ *                     the server). Triggers a "session expired" toast.
+ *   - `cross-tab`   — another tab signed out; this tab detected it via
+ *                     the `storage` event bridge.
+ *   - `initial`     — first hydration, no user yet (suppresses toast).
+ */
+export type SessionEndReason = 'explicit' | 'expired' | 'cross-tab' | 'initial';
 
 /**
  * Authentication service.
@@ -33,60 +48,63 @@ export interface AppUser {
  * services depend on this to know whether to use local storage or cloud
  * storage.
  *
- * Sign-in methods:
- *   - Google sign-in via popup (desktop browsers, Tauri webview)
- *   - Google sign-in via redirect (mobile browsers — popups are blocked
- *     on most mobile browsers)
+ * Sign-in methods (auto-selected by `useRedirect()`):
+ *   - Native Android Google Sign-In via CredentialManager bridge
+ *   - Tauri desktop: opens system browser to /oauth-callback, receives
+ *     the ID token back via the `playforge://` deep link
+ *   - Web: popup (desktop) or redirect (mobile)
  *
- * The popup-vs-redirect decision is made by `useRedirect()` — currently
- * just a viewport-width check, but could be extended to detect Tauri
- * iOS vs. Android if needed.
- *
- * Sign-out:
- *   - Calls `firebase.auth().signOut()`
- *   - Emits a null `currentUser` signal
- *   - Downstream services (`FirestoreDataProvider`, image cache, etc.)
- *     listen for the signal and clean up their state.
- *
- * "Just signed in" flag:
- *   - Set to `true` for ~3 seconds after sign-in completes
- *   - Used by `FirstLoginMergeService` to decide whether to show the
- *     "Upload your local data?" prompt
- *   - Cleared after the merge prompt is dismissed or 3 seconds elapses
+ * Centralized logout / session-end:
+ *   - `signOut()` calls Firebase signOut and bumps `logoutEpoch`.
+ *   - `onAuthStateChanged` detects session expiry (null user after a
+ *     previously-authenticated state) and bumps `logoutEpoch` with
+ *     reason `expired` — drives a "your session expired" toast.
+ *   - A `storage` event listener detects sign-out in other tabs (via
+ *     the `playforge_logout_epoch` localStorage key) and bumps
+ *     `logoutEpoch` with reason `cross-tab`.
+ *   - User-scoped services (InvoiceService, ConfiguratorService,
+ *     ImageResolverService, etc.) `effect()` on `logoutEpoch` to clear
+ *     their in-memory state. This is the single point of truth for
+ *     "the user changed — reset everything user-scoped".
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly fb = inject(FirebaseService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly _user = signal<AppUser | null>(null);
-  /** Current authenticated user, or `null` if not signed in. */
   readonly user = this._user.asReadonly();
 
-  /** True if the user is currently signed in. */
   readonly isAuthenticated = computed(() => this._user() !== null);
 
-  /** True if Firebase is enabled in environment config. When false,
-   *  sign-in is impossible and the app runs in pure-local mode. */
+  /** True if Firebase is enabled in environment config. */
   readonly cloudEnabled = this.fb.enabled;
 
-  /** True while a sign-in attempt is in flight (popup open / redirect pending). */
   private readonly _signingIn = signal(false);
   readonly signingIn = this._signingIn.asReadonly();
 
-  /** True if the auth state has been hydrated from Firebase at least once.
-   *  Used to suppress UI flicker on initial page load. */
   private readonly _hydrated = signal(false);
   readonly hydrated = this._hydrated.asReadonly();
 
-  /** True for ~3s after a sign-in completes. Drives the merge-prompt flow. */
   private readonly _justSignedIn = signal(false);
+  readonly justSignedIn = this._justSignedIn.asReadonly();
+
+  private readonly _logoutEpoch = signal(0);
+  readonly logoutEpoch = this._logoutEpoch.asReadonly();
+
+  private readonly _lastSessionEndReason = signal<SessionEndReason | null>(null);
+  readonly lastSessionEndReason = this._lastSessionEndReason.asReadonly();
+
+  private intentionalLogout = false;
+
+  private static readonly CROSS_TAB_KEY = 'playforge_logout_epoch';
 
   constructor() {
     if (this.fb.enabled) {
       this.init();
       this.setupDeepLinkListener();
+      this.setupCrossTabListener();
     } else {
-      // Cloud disabled — auth state is permanently "logged out".
       this._hydrated.set(true);
     }
   }
@@ -98,22 +116,26 @@ export class AuthService {
       return;
     }
 
-    // Listen for auth state changes (sign-in, sign-out, token refresh).
     onAuthStateChanged(auth, (fbUser) => {
+      const wasAuthenticated = this._user() !== null;
       this._user.set(fbUser ? this.project(fbUser) : null);
       this._hydrated.set(true);
+
+      if (!fbUser && wasAuthenticated) {
+        if (this.intentionalLogout) {
+          this.intentionalLogout = false;
+        } else {
+          this.triggerSessionReset('expired');
+        }
+      }
     });
 
-    // Handle mobile-redirect sign-in: the redirect returns to the page,
-    // then we need to call getRedirectResult to get the user credential.
-    // The onAuthStateChanged listener above will fire with the new user.
     void getRedirectResult(auth).catch((err) => {
       console.warn('[Auth] Redirect sign-in failed:', err);
       this._signingIn.set(false);
     });
   }
 
-  /** Trigger Google sign-in. Uses Native Android dialog on Android, system browser on Desktop Tauri, popup in web mode. */
   async signInWithGoogle(): Promise<void> {
     const auth = this.fb.auth;
     if (!auth) {
@@ -121,12 +143,11 @@ export class AuthService {
       return;
     }
 
-    // 1. Native Android Google Sign-In via CredentialManager
     const androidAuth = (window as unknown as { AndroidAuth?: { signInWithGoogle(clientId: string): void } }).AndroidAuth;
     if (androidAuth) {
       this._signingIn.set(true);
       try {
-        const webClientId = (environment.firebase as any).webClientId || '';
+        const webClientId = environment.firebase.webClientId ?? '';
         await this.signInWithAndroidNative(androidAuth, webClientId);
       } catch (err) {
         console.error('[Auth] Native Android Google Sign-In failed:', err);
@@ -136,7 +157,6 @@ export class AuthService {
       return;
     }
 
-    // 2. Desktop Tauri: open default system browser to handle deep-link OAuth
     const isTauri = typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
     if (isTauri) {
       this._signingIn.set(true);
@@ -150,19 +170,15 @@ export class AuthService {
       return;
     }
 
-    // 3. Web mode: popup or redirect
     this._signingIn.set(true);
     try {
       if (this.useRedirect()) {
         await signInWithRedirect(auth, this.fb.googleProvider);
         return;
       }
-
       const result = await signInWithPopup(auth, this.fb.googleProvider);
       if (result.user) {
-        this._justSignedIn.set(true);
-        this._user.set(this.project(result.user));
-        window.setTimeout(() => this._justSignedIn.set(false), 3000);
+        this.markJustSignedIn(result.user);
       }
     } catch (err) {
       console.error('[Auth] Sign-in failed:', err);
@@ -174,11 +190,15 @@ export class AuthService {
 
   private signInWithAndroidNative(
     androidAuth: { signInWithGoogle(clientId: string): void },
-    webClientId: string
+    webClientId: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const win = window as any;
-      win.onAndroidGoogleSignInSuccess = async (idToken: string) => {
+      interface AndroidBridge {
+        onAndroidGoogleSignInSuccess?: (idToken: string) => void;
+        onAndroidGoogleSignInError?: (errorMsg: string) => void;
+      }
+      const win = window as unknown as AndroidBridge & Record<string, unknown>;
+      win.onAndroidGoogleSignInSuccess = (idToken: string): void => {
         delete win.onAndroidGoogleSignInSuccess;
         delete win.onAndroidGoogleSignInError;
 
@@ -188,22 +208,22 @@ export class AuthService {
           return;
         }
 
-        try {
-          const credential = GoogleAuthProvider.credential(idToken);
-          const result = await signInWithCredential(auth, credential);
-          if (result.user) {
-            this._justSignedIn.set(true);
-            this._user.set(this.project(result.user));
-            window.setTimeout(() => this._justSignedIn.set(false), 3000);
+        void (async () => {
+          try {
+            const credential = GoogleAuthProvider.credential(idToken);
+            const result = await signInWithCredential(auth, credential);
+            if (result.user) {
+              this.markJustSignedIn(result.user);
+            }
+            resolve();
+          } catch (err) {
+            console.error('[Auth] Firebase credential sign-in failed:', err);
+            reject(err instanceof Error ? err : new Error(String(err)));
           }
-          resolve();
-        } catch (err) {
-          console.error('[Auth] Firebase credential sign-in failed:', err);
-          reject(err);
-        }
+        })();
       };
 
-      win.onAndroidGoogleSignInError = (errorMsg: string) => {
+      win.onAndroidGoogleSignInError = (errorMsg: string): void => {
         delete win.onAndroidGoogleSignInSuccess;
         delete win.onAndroidGoogleSignInError;
         console.error('[Auth] Android native Google sign in error:', errorMsg);
@@ -214,28 +234,154 @@ export class AuthService {
     });
   }
 
-  /** Sign out and clear the local cloud cache. */
   async signOut(): Promise<void> {
     const auth = this.fb.auth;
-    if (!auth) return;
     this._justSignedIn.set(false);
-    await firebaseSignOut(auth);
-    // onAuthStateChanged will fire with null and update the signal.
+    this.intentionalLogout = true;
+    this.triggerSessionReset('explicit');
+    if (!auth) return;
+    try {
+      await firebaseSignOut(auth);
+    } catch (err) {
+      console.error('[Auth] Firebase signOut failed:', err);
+      this.intentionalLogout = false;
+    }
   }
 
-  /** True if the user just signed in (within the last 3 seconds). Used
-   *  by FirstLoginMergeService to decide whether to show the merge prompt. */
-  readonly justSignedIn = this._justSignedIn.asReadonly();
+  private triggerSessionReset(reason: SessionEndReason): void {
+    this._lastSessionEndReason.set(reason);
+    this._logoutEpoch.update((v) => v + 1);
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(AuthService.CROSS_TAB_KEY, String(this._logoutEpoch()));
+      } catch {
+        // localStorage may be unavailable (private mode, quota). The
+        // in-process signal still fires, so this tab still resets.
+      }
+    }
+  }
+
+  /** Listen for sign-out events from other tabs. */
+  private setupCrossTabListener(): void {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key !== AuthService.CROSS_TAB_KEY || event.newValue === null) return;
+      this._lastSessionEndReason.set('cross-tab');
+      this._logoutEpoch.update((v) => v + 1);
+      this._user.set(null);
+    };
+
+    window.addEventListener('storage', onStorage);
+    this.destroyRef.onDestroy(() => window.removeEventListener('storage', onStorage));
+  }
+
+  /** Initiate Google sign-in via redirect (used by /oauth-callback). */
+  async signInWithGoogleRedirect(): Promise<void> {
+    const auth = this.fb.auth;
+    if (!auth) {
+      throw new Error('Firebase not initialized');
+    }
+    await signInWithRedirect(auth, this.fb.googleProvider);
+  }
+
+
+  async completeOAuthCallbackFlow(timeoutMs = 8000): Promise<OAuthCallbackResult | null> {
+    const auth = this.fb.auth;
+    if (!auth) return null;
+
+    if (auth.currentUser) {
+      const idToken = await this.safeGetIdToken(auth.currentUser);
+      if (idToken) {
+        const user = this.project(auth.currentUser);
+        this.markJustSignedIn(auth.currentUser);
+        return { idToken, user };
+      }
+      return null;
+    }
+
+    try {
+      const result = await getRedirectResult(auth);
+      if (result?.user) {
+        const idToken = await this.safeGetIdToken(result.user);
+        if (idToken) {
+          const user = this.project(result.user);
+          this.markJustSignedIn(result.user);
+          return { idToken, user };
+        }
+      }
+    } catch (err) {
+      console.warn('[Auth] OAuth callback: redirect result error:', err);
+      return null;
+    }
+
+    return new Promise<OAuthCallbackResult | null>((resolve) => {
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        unsub();
+        resolve(null);
+      }, timeoutMs);
+
+      const unsub = onAuthStateChanged(auth, (fbUser) => {
+        if (!fbUser || settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        unsub();
+        void this.safeGetIdToken(fbUser).then((idToken) => {
+          if (!idToken) {
+            resolve(null);
+            return;
+          }
+          const user = this.project(fbUser);
+          this.markJustSignedIn(fbUser);
+          resolve({ idToken, user });
+        });
+      });
+    });
+  }
+
+  private async safeGetIdToken(user: FirebaseUser): Promise<string | null> {
+    try {
+      return await user.getIdToken();
+    } catch (err) {
+      console.error('[Auth] Failed to get ID token:', err);
+      return null;
+    }
+  }
+
+  private markJustSignedIn(user: FirebaseUser): void {
+    this._user.set(this.project(user));
+    this._justSignedIn.set(true);
+    window.setTimeout(() => this._justSignedIn.set(false), 3000);
+  }
+
+  classifyOAuthError(err: unknown): OAuthErrorKind {
+    if (!err || typeof err !== 'object') return 'default';
+    const code = (err as { code?: string }).code ?? '';
+    const message = (err as { message?: string }).message ?? '';
+
+    if (code === 'auth/expired-action-code' || code === 'auth/invalid-action-code' || code === 'auth/user-token-expired') {
+      return 'expired';
+    }
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/redirect-cancelled-by-user' || code === 'auth/account-exists-with-different-credential') {
+      return 'denied';
+    }
+    if (code === 'auth/network-request-failed' || code === 'auth/network-error' || /network/i.test(message)) {
+      return 'network';
+    }
+    if (code === 'auth/api-key-not-valid' || code === 'auth/configuration-not-found' || code === 'auth/invalid-api-key') {
+      return 'config';
+    }
+    return 'default';
+  }
 
   private useRedirect(): boolean {
     if (typeof window === 'undefined') return false;
-    
-    // In Tauri (both desktop and mobile), always use redirect. Tauri's security model and webview
-    // engines block window.open popups by default.
     const isTauri = typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
     if (isTauri) return true;
-
-    // Mobile browsers block popups, so use redirect there.
     return window.innerWidth < 768;
   }
 
@@ -245,14 +391,11 @@ export class AuthService {
 
     import('@tauri-apps/plugin-deep-link').then(({ onOpenUrl }) => {
       void onOpenUrl((urls) => {
-        console.log('[Auth] Deep links received:', urls);
         for (const urlStr of urls) {
           try {
             const url = new URL(urlStr);
             if (url.protocol === 'playforge:') {
-              // Non-standard protocols (like playforge://) parse the rest as pathname/search.
-              // We retrieve the token from searchParams, or parse the search query as fallback.
-              const token = url.searchParams.get('token') || new URLSearchParams(url.search).get('token');
+              const token = url.searchParams.get('token') ?? new URLSearchParams(url.search).get('token');
               if (token) {
                 void this.signInWithToken(token);
               }
@@ -276,9 +419,7 @@ export class AuthService {
       const credential = GoogleAuthProvider.credential(null, token);
       const result = await signInWithCredential(auth, credential);
       if (result.user) {
-        this._justSignedIn.set(true);
-        this._user.set(this.project(result.user));
-        window.setTimeout(() => this._justSignedIn.set(false), 3000);
+        this.markJustSignedIn(result.user);
       }
     } catch (err) {
       console.error('[Auth] Deep link sign-in failed:', err);
@@ -287,17 +428,42 @@ export class AuthService {
     }
   }
 
-  /** Project a Firebase User into our app-side AppUser shape. */
   private project(fbUser: FirebaseUser): AppUser {
     return {
       uid: fbUser.uid,
       email: fbUser.email,
       displayName: fbUser.displayName,
       photoURL: fbUser.photoURL,
-      // justSignedIn is tracked separately via the _justSignedIn signal;
-      // we expose a snapshot here for callers that read AppUser directly.
-      // The authoritative value is `AuthService.justSignedIn()`.
       justSignedIn: this._justSignedIn(),
     };
   }
+
+  /**
+   * TEST-ONLY: simulate the `onAuthStateChanged` callback firing with
+   * the given user (or null). Exposed so tests can exercise the
+   * intentional-logout vs. token-expiry distinction without a real
+   * Firebase Auth instance. NOT for production use.
+   */
+  simulateAuthStateChange(fbUser: FirebaseUser | null): void {
+    const wasAuthenticated = this._user() !== null;
+    this._user.set(fbUser ? this.project(fbUser) : null);
+    this._hydrated.set(true);
+    if (!fbUser && wasAuthenticated) {
+      if (this.intentionalLogout) {
+        this.intentionalLogout = false;
+      } else {
+        this.triggerSessionReset('expired');
+      }
+    }
+  }
+}
+
+/** Authenticated user shape — a thin projection of `firebase.User`. */
+export interface AppUser {
+  readonly uid: string;
+  readonly email: string | null;
+  readonly displayName: string | null;
+  readonly photoURL: string | null;
+  /** True for ~3s after sign-in — used by the merge flow. */
+  readonly justSignedIn: boolean;
 }

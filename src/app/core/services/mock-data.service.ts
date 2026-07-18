@@ -55,9 +55,7 @@ export class MockDataService {
   static readonly MOCK_CUSTOMER_PREFIX = 'Mock • ';
   static readonly MOCK_INVOICE_PREFIX = 'INV-MOCK-';
 
-  // ---------------------------------------------------------------------------
   // Public seeding surface
-  // ---------------------------------------------------------------------------
 
   /**
    * Seed catalog: 3 families (slides, swings, climbing) each with parts +
@@ -206,9 +204,7 @@ export class MockDataService {
     await this.clearActiveInvoice();
   }
 
-  // ---------------------------------------------------------------------------
   // Live counts (consumed by the DevTools UI)
-  // ---------------------------------------------------------------------------
 
   readonly counts = {
     families: () => this.catalog.families().length,
@@ -218,9 +214,7 @@ export class MockDataService {
     favorites: () => this.favorites.count(),
   };
 
-  // ---------------------------------------------------------------------------
   // Mock data builders — kept private so the public surface stays minimal.
-  // ---------------------------------------------------------------------------
 
   private buildMockFamilies(): Omit<ProductFamily, 'id' | 'createdAt' | 'updatedAt'>[] {
     return [
@@ -483,9 +477,7 @@ export class MockDataService {
     return out;
   }
 
-  // ---------------------------------------------------------------------------
   // Mock-data cleanup helpers
-  // ---------------------------------------------------------------------------
 
   private async clearMockFamilies(): Promise<void> {
     const mockFamilyIds = this.catalog
@@ -527,9 +519,7 @@ export class MockDataService {
     await this.invoiceService.clearLines();
   }
 
-  // ---------------------------------------------------------------------------
   // Predicates
-  // ---------------------------------------------------------------------------
 
   private hasMockFamilies(): boolean {
     return this.catalog.families().some((f) =>
@@ -543,9 +533,7 @@ export class MockDataService {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Small private helpers
-  // ---------------------------------------------------------------------------
 
   private part(
     id: string,

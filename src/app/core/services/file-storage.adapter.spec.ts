@@ -1,7 +1,10 @@
 import 'fake-indexeddb/auto';
+import { TestBed } from '@angular/core/testing';
 import { FileStorageAdapter } from './file-storage.adapter';
 import { BrowserFileStorageAdapter } from './browser-file-storage.adapter';
 import { ImageResolverService } from './image-resolver.service';
+import { FirebaseStorageService } from './firebase-storage.service';
+import { AuthService } from './auth.service';
 import { parseStoredFileRef } from './file-storage.adapter';
 
 /**
@@ -101,12 +104,39 @@ describe('ImageResolverService', () => {
   let resolver: ImageResolverService;
   let adapter: FileStorageAdapter;
 
+  /**
+   * Stub AuthService for the ImageResolverService — the auth gate
+   * requires `isAuthenticated()` to return true for fbstorage://
+   * resolution to proceed. These tests don't actually hit Firebase
+   * Storage, so we return `true` and provide a stub `logoutEpoch`
+   * signal so the constructor's `effect()` doesn't fail.
+   */
+  const authStub = {
+    isAuthenticated: () => true,
+    logoutEpoch: () => 0,
+  } as Partial<AuthService>;
+
+  /**
+   * Stub FirebaseStorageService — these tests only exercise idb://
+   * and passthrough URLs, so the fbstorage:// path is never reached.
+   * The stub is here only so DI can construct ImageResolverService.
+   */
+  const fbStorageStub = {} as Partial<FirebaseStorageService>;
+
   // Use a fresh adapter instance (not from TestBed) so we can guarantee
   // it's destroyed after each test — avoiding lingering IDB connections
   // that block deleteDatabase in subsequent tests.
   beforeEach(() => {
     adapter = new BrowserFileStorageAdapter();
-    resolver = new ImageResolverService(adapter);
+    TestBed.configureTestingModule({
+      providers: [
+        ImageResolverService,
+        { provide: FileStorageAdapter, useValue: adapter },
+        { provide: FirebaseStorageService, useValue: fbStorageStub },
+        { provide: AuthService, useValue: authStub },
+      ],
+    });
+    resolver = TestBed.inject(ImageResolverService);
   });
 
   afterEach(() => {

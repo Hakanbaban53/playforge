@@ -34,11 +34,12 @@ export class I18nService {
   }
 
   use(lang: AppLanguage): void {
-    this.translate.use(lang);
+    void firstValueFrom(this.translate.use(lang)).then(() => {
+      this.syncDocumentTitle();
+    });
     this.lang.set(lang);
     this.storage.write(STORAGE_KEY, lang);
     this.syncHtmlLang(lang);
-    this.syncDocumentTitle();
   }
 
   t(key: string, params?: Record<string, unknown>): string {

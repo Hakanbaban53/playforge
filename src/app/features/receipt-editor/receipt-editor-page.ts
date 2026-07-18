@@ -55,19 +55,13 @@ export class ReceiptEditorPage {
   readonly layout = this.layoutService.layout;
   readonly active = this.invoice.active;
 
-  /** Track which element is currently selected for editing (its id). */
   readonly selectedId = signal<string | null>(null);
 
-  /** IDs of layout elements currently playing their exit animation. The
-   *  @for keeps them in the DOM until the animation finishes, then the
-   *  layout service actually removes them. */
   readonly leavingIds = signal<ReadonlySet<string>>(new Set());
 
-  /** Per-element upload-in-flight flag (keyed by element id). */
   readonly uploadingFor = signal<string | null>(null);
   readonly uploadError = signal<string | null>(null);
 
-  // Style picker options
   readonly textWeights = [
     { value: '400', key: 'receipt.regular' },
     { value: '600', key: 'receipt.semiBold' },
@@ -83,9 +77,6 @@ export class ReceiptEditorPage {
     { value: 'cover', key: 'receipt.cover' },
   ];
   readonly imagePerRowOptions = ['1', '2', '3', '4'];
-
-  // ---- Mutations ----
-
   onDrop(event: CdkDragDrop<LayoutElement[]>): void {
     const current = [...this.layout()];
     moveItemInArray(current, event.previousIndex, event.currentIndex);
@@ -131,16 +122,11 @@ export class ReceiptEditorPage {
     void this.layoutService.updateStyle(id, key, value);
   }
 
-  /** Toggle a boolean-ish style (italic / underline) from a checkbox. */
   toggleStyle(id: string, key: 'fontStyle' | 'textDecoration', onValue: string, offValue: string, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
     void this.layoutService.updateStyle(id, key, checked ? onValue : offValue);
   }
 
-  /**
-   * Font size stepper — increments or decrements the current font size by
-   * `step` pixels. Allows arbitrary px values, not just preset choices.
-   */
   bumpFontSize(el: LayoutElement, step: number): void {
     const current = this.parsePx(el.styles?.fontSize, el.type === 'header' ? 20 : 14);
     const next = Math.max(8, Math.min(96, current + step));
@@ -157,9 +143,6 @@ export class ReceiptEditorPage {
   goBack(): void {
     void this.router.navigate(['/invoice']);
   }
-
-  // ---- Helpers used by the template ----
-
   isRemovable(el: LayoutElement): boolean {
     return this.layoutService.isRemovable(el);
   }
@@ -176,7 +159,6 @@ export class ReceiptEditorPage {
     return this.layoutService.isImageStylable(el);
   }
 
-  /** Map a layout element type to a Material Symbol icon name. */
   elementIcon(type: LayoutElementType): string {
     switch (type) {
       case 'header': return 'description';
@@ -196,15 +178,11 @@ export class ReceiptEditorPage {
     return getStyleValue(el, key, fallback);
   }
 
-  /** Parse an image element's content into a list of URLs. */
   imageSources(el: LayoutElement): string[] {
     return parseImageSources(el.content);
   }
 
-  /**
-   * Upload image files via the FileStorageAdapter and append the returned
-   * stable URLs to the element's content.
-   */
+
   async onImageUpload(el: LayoutElement, event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = input.files;
@@ -231,7 +209,6 @@ export class ReceiptEditorPage {
     }
   }
 
-  /** Remove a single image URL from an image element's content. */
   removeImage(el: LayoutElement, index: number): void {
     const sources = this.imageSources(el);
     sources.splice(index, 1);

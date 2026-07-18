@@ -15,6 +15,7 @@ import {
 } from '../../core/models/import.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
+import { SpinnerComponent } from '../../shared/components/spinner.component';
 
 export type ImportMode = 'merge' | 'replace';
 export type ImportTarget = 'catalog' | 'customers' | 'settings';
@@ -34,7 +35,7 @@ export type ImportTarget = 'catalog' | 'customers' | 'settings';
 @Component({
   selector: 'app-import-page',
   standalone: true,
-  imports: [IconComponent, ButtonComponent, TranslatePipe],
+  imports: [IconComponent, ButtonComponent, SpinnerComponent, TranslatePipe],
   templateUrl: './import-page.html',
   styleUrl: './import-page.scss',
 })
@@ -55,20 +56,20 @@ export class ImportPage {
 
   readonly importMode = signal<ImportMode>('merge');
   readonly importTarget = signal<ImportTarget>('catalog');
-  readonly stats = signal({ families: 0, variants: 0 });
 
-  // Customer import state
+  readonly stats = computed(() => ({
+    families: this.catalog.families().length,
+    variants: this.catalog.variants().length,
+  }));
+
   readonly customerResult = signal<CustomerImportValidationResult | null>(null);
   readonly customerPreview = signal<ImportPreview | null>(null);
   readonly customerApplied = signal<{ created: number; updated: number } | null>(null);
 
-  // App settings import state
   readonly settingsResult = signal<AppSettingsImportResult | null>(null);
   readonly settingsApplied = signal<{ applied: string[]; skipped: string[] } | null>(null);
-  /** Section selection toggles for app-settings import. */
   readonly settingsSectionSelected = signal<Record<string, boolean>>({});
 
-  /** Selected row count — computed from the active preview. */
   readonly selectedCount = computed(() => {
     if (this.importTarget() === 'settings') {
       return this.settingsSelectedSectionCount();
@@ -79,7 +80,6 @@ export class ImportPage {
 
   readonly customerCount = computed(() => this.customersSvc.customers().length);
 
-  /** Sections present in the validated settings bundle, in display order. */
   readonly settingsSections = computed<string[]>(() => {
     const r = this.settingsResult();
     if (!r?.bundle) return [];
@@ -88,20 +88,17 @@ export class ImportPage {
     return order.filter((k) => bundle[k] !== undefined);
   });
 
-  /** How many sections the user has ticked for import. */
   readonly settingsSelectedSectionCount = computed(() => {
     const sel = this.settingsSectionSelected();
     return this.settingsSections().filter((k) => sel[k] !== false).length;
   });
 
-  /** Per-section errors from the settings validation result. */
   readonly settingsSectionErrors = computed(() => {
     const r = this.settingsResult();
     if (!r) return [];
     return r.errors;
   });
 
-  /** Returns whichever preview is active based on importTarget. */
   readonly activePreview = computed(() => {
     return this.importTarget() === 'customers' ? this.customerPreview() : this.preview();
   });
@@ -145,13 +142,6 @@ export class ImportPage {
     if (!r) return 0;
     return r.totalRows;
   });
-
-  constructor() {
-    this.stats.set({
-      families: this.catalog.families().length,
-      variants: this.catalog.variants().length,
-    });
-  }
 
   setTarget(target: ImportTarget): void {
     this.importTarget.set(target);
@@ -208,8 +198,6 @@ export class ImportPage {
 
   downloadTemplate(): void {
     if (this.importTarget() === 'settings') {
-      // No template to download — JSON bundles are produced by the export
-      // page. We just point the user there.
       this.downloadMessage.set(this.i18n.t('import.settingsNoTemplate'));
       return;
     }
@@ -282,7 +270,6 @@ export class ImportPage {
       if (this.importTarget() === 'settings') {
         const res = await this.appSettings.validate(file);
         this.settingsResult.set(res);
-        // Default: every valid section is selected.
         const sel: Record<string, boolean> = {};
         for (const k of res.validSections) sel[k] = true;
         this.settingsSectionSelected.set(sel);
@@ -335,10 +322,6 @@ export class ImportPage {
     if (selectedDrafts.length === 0) return;
     const summary = await this.excel.applyDrafts(selectedDrafts, this.importMode());
     this.applied.set(summary);
-    this.stats.set({
-      families: this.catalog.families().length,
-      variants: this.catalog.variants().length,
-    });
   }
 
   reset(): void {
@@ -354,9 +337,6 @@ export class ImportPage {
     this.errorMessage.set(null);
     this.downloadMessage.set(null);
   }
-
-  // ---- App-settings import helpers ----
-
   toggleSection(section: string): void {
     this.settingsSectionSelected.update((sel) => ({ ...sel, [section]: !(sel[section] !== false) }));
   }
@@ -386,7 +366,6 @@ export class ImportPage {
     return map[section] ?? section;
   }
 
-  // Preview row display helpers that work for both catalog and customer rows
   previewRowName(row: ImportPreviewRow): string {
     const d = row.draft;
     if ('familyName' in d) return (d).familyName;

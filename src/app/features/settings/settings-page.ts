@@ -15,6 +15,7 @@ import { ReceiptLayoutService } from '../../core/services/receipt-layout.service
 import { PaperSize } from '../../core/models/invoice.model';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ButtonComponent } from '../../shared/components/button.component';
+import { SpinnerComponent } from '../../shared/components/spinner.component';
 
 /**
  * Settings page — appearance (theme + language), currency rates, invoice
@@ -23,7 +24,7 @@ import { ButtonComponent } from '../../shared/components/button.component';
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [IconComponent, ButtonComponent, TranslatePipe],
+  imports: [IconComponent, ButtonComponent, SpinnerComponent, TranslatePipe],
   templateUrl: './settings-page.html',
   styleUrl: './settings-page.scss',
 })
@@ -55,17 +56,14 @@ export class SettingsPage {
     return skus.size;
   });
 
-  // Theme
   readonly themeMode = this.themeService.mode;
   readonly themeModes: ThemeMode[] = ['light', 'dark', 'system'];
   setTheme(m: ThemeMode): void { this.themeService.setMode(m); }
 
-  // Language
   readonly currentLang = this.i18n.lang;
   readonly languages: AppLanguage[] = this.i18n.languages;
   setLang(l: AppLanguage): void { this.i18n.use(l); }
 
-  // Currency rates
   readonly rates = this.currencyService.rates;
   readonly supportedCurrencies = this.currencyService.supportedCurrencies;
   readonly baseCurrency = this.currencyService.base;
@@ -81,7 +79,6 @@ export class SettingsPage {
     }
   }
 
-  // Invoice defaults
   readonly defaults = this.invoiceDefaults.defaults;
 
   setDefaultPaper(event: Event): void {
@@ -101,7 +98,6 @@ export class SettingsPage {
     }
   }
 
-  // Catalog actions
   async clearCatalog(): Promise<void> {
     if (!await this.confirmSvc.confirm(this.i18n.t('settings.resetConfirm'), 'Reset catalog')) return;
     await this.catalog.clearAll();
@@ -120,10 +116,6 @@ export class SettingsPage {
 
     if (!await this.confirmSvc.confirm(confirmMsg, 'Wipe all data')) return;
 
-    // Wipe ALL data through the service layer so it works regardless of
-    // which DataProvider is active (local or Firestore). Each service's
-    // clear method goes through the DataProvider, which writes to
-    // localStorage (logged out) or Firestore (logged in).
     await this.catalog.clearAll();
     await this.customersSvc.clearAll();
     await this.favoritesSvc.clear();
@@ -131,9 +123,6 @@ export class SettingsPage {
     await this.invoice.clearLines();
     await this.receiptLayoutSvc.resetToDefault();
 
-    // Also clear localStorage keys for local-only data that doesn't go
-    // through a service (e.g. the active invoice draft, which is always
-    // local). This catches any stragglers.
     if (typeof localStorage !== 'undefined') {
       const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -143,7 +132,6 @@ export class SettingsPage {
       keys.forEach((k) => localStorage.removeItem(k));
     }
 
-    // Clear IndexedDB image storage (uploaded images).
     await this.wipeIndexedDB();
 
     location.reload();

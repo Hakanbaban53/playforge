@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { CurrencyService, CurrencyCode } from './currency.service';
+import { provideInMemoryDataAndStubAuth } from './testing';
 
 /**
  * CurrencyService tests — covers rate configuration, conversion math, and
@@ -10,7 +11,9 @@ describe('CurrencyService', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [...provideInMemoryDataAndStubAuth()],
+    });
     service = TestBed.inject(CurrencyService);
   });
 
@@ -23,11 +26,9 @@ describe('CurrencyService', () => {
     expect(service.rates().USD).toBe(1);
   });
 
-  it('setRate() updates and persists the rate', () => {
+  it('setRate() updates the rate reactively', () => {
     service.setRate('TRY', 35.5);
     expect(service.rates().TRY).toBe(35.5);
-    const stored = JSON.parse(localStorage.getItem('pgpos:app:exchange-rates')!);
-    expect(stored.TRY).toBe(35.5);
   });
 
   it('setRate() rejects negative numbers', () => {
@@ -74,11 +75,9 @@ describe('CurrencyService', () => {
     expect(s).toContain('100.00');
   });
 
-  it('setBase() updates and persists the base currency', () => {
+  it('setBase() updates the base currency reactively', () => {
     service.setBase('TRY');
     expect(service.base()).toBe('TRY');
-    // StorageService JSON-encodes values, so the stored form is '"TRY"'.
-    expect(localStorage.getItem('pgpos:app:base-currency')).toBe('"TRY"');
   });
 
   it('convertAndFormat() combines conversion and formatting', () => {

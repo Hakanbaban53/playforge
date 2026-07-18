@@ -101,9 +101,6 @@ export class LocalDataProvider extends DataProvider {
     // signal values are re-read from localStorage on next access.
     return Promise.resolve();
   }
-
-  // ---- internals ----
-
   private getOrCreateCollectionSignal<T>(name: string): WritableSignal<T[]> {
     let sig = this.collectionSignals.get(name) as WritableSignal<T[]> | undefined;
     if (!sig) {

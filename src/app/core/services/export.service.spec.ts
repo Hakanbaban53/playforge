@@ -5,6 +5,7 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { ExportService } from './export.service';
 import { CatalogService } from './catalog.service';
 import { InvoiceService } from './invoice.service';
+import { provideInMemoryDataAndStubAuth } from './testing';
 import * as XLSX from 'xlsx';
 
 /**
@@ -31,6 +32,7 @@ describe('ExportService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideTranslateService({}),
+        ...provideInMemoryDataAndStubAuth(),
       ],
     });
     service = TestBed.inject(ExportService);

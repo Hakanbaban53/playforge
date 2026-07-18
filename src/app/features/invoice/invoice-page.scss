@@ -410,8 +410,8 @@
     background: transparent;
     color: var(--text-subtle);
     cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
+    padding: 7px;
+    border-radius: var(--radius-sm);
     display: grid;
     place-items: center;
     transition: background var(--motion-fast), color var(--motion-fast);
@@ -419,6 +419,10 @@
     &:hover {
       color: var(--danger-500);
       background: var(--danger-50);
+    }
+
+    &:active {
+      transform: scale(0.92);
     }
 
     &:focus-visible {

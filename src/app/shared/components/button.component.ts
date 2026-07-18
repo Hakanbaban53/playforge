@@ -1,22 +1,14 @@
 import { Component, input } from '@angular/core';
+import { SpinnerComponent } from './spinner.component';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
-/**
- * Single-button primitive with shared styling and variant system.
- * Enterprise apps usually standardize on one Button component so theme
- * changes ripple everywhere consistently.
- *
- * Click handling: we deliberately do NOT bind a `(click)` handler on the
- * inner `<button>`. That way the native click event bubbles naturally up to
- * `<app-button>`'s host element, where consumer `(click)="..."` bindings
- * fire as expected. Binding a click handler on the inner button would
- * intercept the event before it bubbles, breaking consumer handlers.
- */
+
 @Component({
   selector: 'app-button',
   standalone: true,
+  imports: [SpinnerComponent],
   template: `
     <button
       [type]="type()"
@@ -24,7 +16,7 @@ type ButtonSize = 'sm' | 'md' | 'lg';
       [class]="'btn btn--' + variant() + ' btn--' + size()"
     >
       @if (loading()) {
-        <span class="btn__spinner" aria-hidden="true"></span>
+        <app-spinner [size]="14" />
       }
       <ng-content />
     </button>
@@ -55,13 +47,14 @@ type ButtonSize = 'sm' | 'md' | 'lg';
       .btn:not(:disabled):active {
         transform: translateY(1px);
       }
-      /* Focus ring via outline (not box-shadow) so it doesn't conflict
-         with the hover box-shadow on primary/accent/danger variants.
-         outline-offset keeps the ring 2px off the button edge so it
-         reads on both light and dark backgrounds. */
       .btn:focus-visible {
-        outline: 2px solid var(--brand-500);
-        outline-offset: 2px;
+        outline: none;
+        box-shadow: 0 0 0 3px var(--brand-focus-ring);
+      }
+      .btn--primary:focus-visible,
+      .btn--accent:focus-visible,
+      .btn--danger:focus-visible {
+        box-shadow: 0 0 0 3px var(--brand-focus-ring);
       }
 
       .btn--sm {
@@ -120,15 +113,6 @@ type ButtonSize = 'sm' | 'md' | 'lg';
       .btn--danger:not(:disabled):hover {
         background: var(--danger-700);
         box-shadow: var(--shadow-sm);
-      }
-
-      .btn__spinner {
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        border: 2px solid currentColor;
-        border-top-color: transparent;
-        animation: var(--motion-spin);
       }
     `,
   ],

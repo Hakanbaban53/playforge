@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal, effect, untracked } from '@angular/core';
 import {
   Invoice,
   InvoiceLine,
@@ -10,6 +10,7 @@ import {
 import { DataProvider, Collections } from './data-provider';
 import { LocalDataProvider } from './local-data-provider';
 import { InvoiceDefaultsService } from './invoice-defaults.service';
+import { AuthService } from './auth.service';
 
 /**
  * Invoice state service.
@@ -23,24 +24,25 @@ import { InvoiceDefaultsService } from './invoice-defaults.service';
  * Storage split:
  *   - Active invoice draft: stored as a single doc under `invoice:active`
  *     via `LocalDataProvider` — ALWAYS local, never synced to Firestore.
- *     This is the work-in-progress, NOT a saved record. The user might be
- *     mid-edit on their desktop and we don't want a half-finished invoice
- *     appearing on their phone, nor do we want every keystroke (editing
- *     the customer name, quantity, etc.) to trigger a Firestore write.
+ *     This is the work-in-progress, NOT a saved record.
  *
  *   - Saved invoices: stored as a collection under `invoice:saved` via
  *     the swapped `DataProvider`. These ARE synced across devices when
  *     the user is signed in.
+ *
+ * Logout reset: on every logout (driven by `AuthService.logoutEpoch`),
+ * the active invoice draft is replaced with a fresh one. Without this,
+ * user A's half-finished invoice would still be on screen if user B
+ * logged in on the same device — a real data-leakage risk.
  */
 @Injectable({ providedIn: 'root' })
 export class InvoiceService {
   private readonly data = inject(DataProvider);
   private readonly localData = inject(LocalDataProvider);
   private readonly defaultsService = inject(InvoiceDefaultsService);
+  private readonly auth = inject(AuthService);
 
-  /** Reactive view of the active invoice doc — ALWAYS local, never synced.
-   *  Uses LocalDataProvider directly so rapid edits (quantity changes,
-   *  customer name typing, etc.) don't trigger Firestore writes. */
+  /** Reactive view of the active invoice doc — ALWAYS local, never synced. */
   private readonly activeDoc = this.localData.doc<Invoice>(Collections.invoiceActive);
   /** Reactive view of the saved invoices collection — synced when logged in. */
   readonly savedInvoices = this.data.collection<Invoice>(Collections.invoiceSaved);
@@ -52,12 +54,10 @@ export class InvoiceService {
     this.active().lines.reduce((sum, l) => sum + lineTotal(l), 0),
   );
 
-  /** Active (enabled, non-zero) taxes on the current invoice. */
   readonly activeTaxes = computed(() =>
     this.active().meta.taxes.filter((t) => t.enabled && t.value !== 0),
   );
 
-  /** Total tax amount. */
   readonly totalTax = computed(() =>
     this.activeTaxes().reduce((sum, tax) => {
       if (tax.type === 'fixed') return sum + tax.value;
@@ -65,24 +65,38 @@ export class InvoiceService {
     }, 0),
   );
 
-  /** Grand total = subtotal + totalTax. */
   readonly grandTotal = computed(() => this.subtotal() + this.totalTax());
 
-  /** Saved-version signal — bumped for backward compat with code that
-   *  expects to track saved-list changes via a version counter. */
   private readonly _savedVersion = signal(0);
   readonly savedVersion = this._savedVersion.asReadonly();
 
   constructor() {
-    // Bump savedVersion whenever the saved-list signal changes.
-    // This keeps backward compat with code that called `savedVersion()`
-    // to invalidate computed values.
-    computed(() => this.savedInvoices())(); // touch to track
+    // Reset the active invoice draft on every logout. This clears any
+    // in-progress invoice that belonged to the previous user — critical
+    // for shared-device scenarios.
+    //
+    // IMPORTANT: this effect must ONLY track `logoutEpoch`. If it also
+    // reads `activeDoc()` (without untracked), it creates a feedback
+    // loop: every addLine() write to activeDoc re-triggers the effect,
+    // which sees lines.length > 0 and replaces the invoice with a fresh
+    // one — silently deleting the line the user just added.
+    //
+    // The `epoch > 0` guard ensures the initial effect run (epoch=0,
+    // no logout has happened yet) does NOT wipe an existing draft that
+    // was loaded from localStorage on page load.
+    effect(() => {
+      const epoch = this.auth.logoutEpoch();
+      if (epoch === 0) return; // initial state — no logout has occurred
+      untracked(() => {
+        const current = this.activeDoc();
+        if (current && current.lines.length > 0) {
+          void this.localData.setDoc(Collections.invoiceActive, this.freshInvoice());
+        }
+      });
+    });
   }
 
-  // ---------------------------------------------------------------------------
   // Mutations
-  // ---------------------------------------------------------------------------
 
   async addLine(line: InvoiceLine): Promise<void> {
     const inv = this.active();
@@ -213,7 +227,6 @@ export class InvoiceService {
     await this.localData.setDoc(Collections.invoiceActive, clone);
   }
 
-  /** Delete a previously-saved invoice by id. */
   async deleteSaved(invoiceId: string): Promise<void> {
     await this.data.removeRecord(Collections.invoiceSaved, invoiceId);
     this._savedVersion.update((v) => v + 1);
@@ -288,9 +301,7 @@ export class InvoiceService {
     }));
   }
 
-  // ---------------------------------------------------------------------------
   // Internals
-  // ---------------------------------------------------------------------------
 
   private freshInvoice(docType: 'quote' | 'invoice' = 'invoice'): Invoice {
     const defaults = this.defaultsService.defaults();

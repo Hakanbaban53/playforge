@@ -663,7 +663,28 @@
     "signIn": "Giriş yap",
     "signOut": "Çıkış yap",
     "signingIn": "Giriş yapılıyor…",
-    "signInWithGoogle": "Google ile giriş yap"
+    "signInWithGoogle": "Google ile giriş yap",
+    "sessionExpired": "Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
+    "sessionEndedElsewhere": "Başka bir sekmede çıkış yaptınız.",
+    "callback": {
+      "tagline": "Satış & Yapılandırma",
+      "promptTitle": "PlayForge'a giriş yapın",
+      "promptBody": "Uygulamaya güvenli bir şekilde bağlanmak için Google hesabınızı kullanın.",
+      "loadingTitle": "Giriş yapılıyor",
+      "loadingBody": "Giriş işlemi tamamlanıyor, lütfen bekleyin…",
+      "successTitle": "Giriş başarılı",
+      "successBody": "Uygulamaya geri yönlendiriliyorsunuz…",
+      "successOpenApp": "Uygulamayı aç",
+      "successHint": "Uygulama otomatik açılmazsa yukarıdaki butona dokunun.",
+      "errorTitle": "Giriş başarısız",
+      "errorRetry": "Tekrar dene",
+      "errorReturn": "Uygulamaya dön",
+      "errorExpired": "Oturum süresi doldu. Lütfen tekrar deneyin.",
+      "errorDenied": "İzin reddedildi. Lütfen tekrar deneyip onay verin.",
+      "errorNetwork": "Ağ hatası — bağlantınızı kontrol edip tekrar deneyin.",
+      "errorConfig": "Firebase yapılandırılmamış. Lütfen destekle iletişime geçin.",
+      "errorDefault": "Giriş sırasında bir şeyler ters gitti."
+    }
   },
   "merge": {
     "title": "Yerel verilerinizi yükleyin?",

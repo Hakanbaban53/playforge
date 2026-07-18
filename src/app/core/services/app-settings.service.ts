@@ -225,9 +225,6 @@ export class AppSettingsService {
 
     return { applied, skipped };
   }
-
-  // ---- per-section validators ----
-
   private validateLayout(value: unknown): string | null {
     if (!Array.isArray(value)) return 'Receipt layout must be an array.';
     const arr = value as unknown[];

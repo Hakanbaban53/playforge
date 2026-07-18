@@ -18,25 +18,18 @@ export interface InvoiceLinePart {
 }
 
 export interface InvoiceLine {
-  /** Stable id within the invoice. */
   id: string;
   /** Source variant SKU, if this line came from a catalog variant. */
   sourceVariantSku?: string;
-  /** Source family id, if applicable. */
   familyId?: string;
-  /** Display name on the invoice. */
   name: string;
-  /** Marketing code shown alongside the name. */
   code: string;
   /** Resolved part breakdown — may be empty for one-piece products. */
   parts: InvoiceLinePart[];
-  /** Per-unit price (sum of parts, or explicit override). */
   unitPrice: number;
-  /** Number of assemblies on this line. */
   quantity: number;
   /** Optional per-line discount. When absent, no discount is applied. */
   discount?: LineDiscount;
-  /** Primary image URL for the line (rendered on the PDF). */
   imageUrl?: string;
   /** Optional size label (e.g. "5m"). */
   size?: string;
@@ -100,7 +93,7 @@ export interface Invoice {
   updatedAt: number;
 }
 
-/** Helper: total for a single line, applying any per-line discount. */
+/** Total for a single line, applying any per-line discount. */
 export function lineTotal(line: InvoiceLine): number {
   const gross = line.unitPrice * line.quantity;
   return applyDiscount(gross, line.discount);
@@ -118,7 +111,7 @@ export function applyDiscount(amount: number, discount?: LineDiscount): number {
   return Math.max(0, amount - Math.max(0, discount.value));
 }
 
-/** Helper: build an InvoiceLine from a resolved catalog variant. */
+/** Build an InvoiceLine from a resolved catalog variant. */
 export function lineFromResolved(
   resolved: ResolvedProduct,
   quantity: number,
@@ -144,7 +137,7 @@ export function lineFromResolved(
   };
 }
 
-/** Helper: build an InvoiceLine from a configured assembly. */
+/** Build an InvoiceLine from a configured assembly. */
 export function lineFromConfiguration(
   familyName: string,
   familyCode: string,

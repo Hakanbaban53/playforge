@@ -1,256 +1,410 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { signInWithRedirect, getRedirectResult, onAuthStateChanged, User } from 'firebase/auth';
-import { FirebaseService } from '../../core/services/firebase.service';
+import { Component, OnInit, inject, signal, DestroyRef } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
+import { AuthService, OAuthErrorKind } from '../../core/services/auth.service';
+import { IconComponent } from '../../shared/components/icon.component';
+import { ButtonComponent } from '../../shared/components/button.component';
+import { SpinnerComponent } from '../../shared/components/spinner.component';
 
+type CallbackStatus =
+  | 'loading'      // consuming redirect result / waiting for auth state
+  | 'prompt'       // no user, no redirect in flight — show "Sign in with Google"
+  | 'success'      // token obtained, deep-link redirect in progress
+  | 'error';       // something went wrong
+
+/**
+ * OAuth callback page.
+ *
+ * Serves as the landing page for the Tauri desktop deep-link OAuth flow:
+ * the desktop app opens the system browser to `/oauth-callback`, the
+ * user signs in with Google, and this page extracts the ID token and
+ * redirects back to the app via the `playforge://oauth?token=...` deep
+ * link. The desktop app's deep-link listener catches the redirect and
+ * signs the user in via `signInWithCredential`.
+ *
+ * States:
+ *   - `loading`: while `AuthService.completeOAuthCallbackFlow()` runs.
+ *   - `prompt`:  no signed-in user and no pending redirect — user must
+ *                click "Sign in with Google" to start the flow.
+ *   - `success`: token obtained. Show a brief confirmation, then trigger
+ *                the `playforge://` deep link. Also expose a manual
+ *                "Open app" button in case the deep link doesn't fire
+ *                automatically (mobile browsersoftware, popup blockers, etc.).
+ *   - `error`:   redirect-result consumption failed, token retrieval
+ *                failed, or Firebase isn't configured.
+ *
+ * The page is fully standalone (rendered outside the app shell), so it
+ * pulls in the global stylesheet and uses design-system tokens directly.
+ */
 @Component({
   selector: 'app-oauth-callback',
   standalone: true,
-  imports: [CommonModule],
+  imports: [TranslatePipe, IconComponent, ButtonComponent, SpinnerComponent],
   template: `
-    <div class="oauth-container">
-      <div class="oauth-card">
-        <div class="logo">PlayForge</div>
-
-        <div *ngIf="status() === 'login-prompt'" class="status-box login-prompt">
-          <div class="icon google-icon">G</div>
-          <h3>PlayForge'a Giriş Yapın</h3>
-          <p>Uygulamaya güvenli bir şekilde bağlanmak için Google hesabınızla giriş yapın.</p>
-          <button (click)="tryLogin()" class="btn-primary">Google ile Giriş Yap</button>
+    <div class="oauth-page">
+      <div class="oauth-card surface-card">
+        <!-- Brand header -->
+        <div class="oauth-card__brand">
+          <div class="oauth-card__logo">
+            <app-icon name="inventory_2" [size]="28" />
+          </div>
+          <div class="oauth-card__brand-text">
+            <span class="oauth-card__brand-name">PlayForge</span>
+            <span class="oauth-card__brand-tag">{{ 'auth.callback.tagline' | translate }}</span>
+          </div>
         </div>
 
-        <div *ngIf="status() === 'loading'" class="status-box">
-          <div class="spinner"></div>
-          <p>Oturum açılıyor, lütfen bekleyin...</p>
-        </div>
+        <!-- Loading -->
+        @if (status() === 'loading') {
+          <div class="oauth-state oauth-state--loading anim-scale-in">
+            <div class="oauth-state__icon oauth-state__icon--loading">
+              <app-spinner [size]="32" />
+            </div>
+            <h3 class="oauth-state__title">{{ 'auth.callback.loadingTitle' | translate }}</h3>
+            <p class="oauth-state__body">{{ 'auth.callback.loadingBody' | translate }}</p>
+          </div>
+        }
 
-        <div *ngIf="status() === 'success'" class="status-box success">
-          <div class="icon">✓</div>
-          <h3>Giriş Başarılı!</h3>
-          <p>Uygulamaya geri yönlendiriliyorsunuz...</p>
-          <a [href]="deepLinkUrl()" class="btn-primary">Uygulamayı Aç</a>
-          <p class="hint">Eğer uygulama otomatik olarak açılmazsa yukarıdaki butona tıklayabilirsiniz.</p>
-        </div>
+        <!-- Prompt -->
+        @if (status() === 'prompt') {
+          <div class="oauth-state oauth-state--prompt anim-scale-in">
+            <div class="oauth-state__icon oauth-state__icon--prompt">
+              <span class="oauth-google-g" aria-hidden="true">G</span>
+            </div>
+            <h3 class="oauth-state__title">{{ 'auth.callback.promptTitle' | translate }}</h3>
+            <p class="oauth-state__body">{{ 'auth.callback.promptBody' | translate }}</p>
+            <app-button
+              variant="primary"
+              size="lg"
+              [loading]="startingRedirect()"
+              (click)="startSignIn()"
+            >
+              <span class="oauth-google-g oauth-google-g--small" aria-hidden="true">G</span>
+              {{ 'auth.signInWithGoogle' | translate }}
+            </app-button>
+          </div>
+        }
 
-        <div *ngIf="status() === 'error'" class="status-box error">
-          <div class="icon">✕</div>
-          <h3>Giriş Başarısız</h3>
-          <p class="error-msg">{{ errorMessage() }}</p>
-          <button (click)="tryLogin()" class="btn-primary">Tekrar Dene</button>
-        </div>
+        <!-- Success -->
+        @if (status() === 'success') {
+          <div class="oauth-state oauth-state--success anim-scale-in">
+            <div class="oauth-state__icon oauth-state__icon--success">
+              <app-icon name="check" [size]="32" />
+            </div>
+            <h3 class="oauth-state__title">{{ 'auth.callback.successTitle' | translate }}</h3>
+            <p class="oauth-state__body">{{ 'auth.callback.successBody' | translate }}</p>
+            <a [href]="deepLinkUrl()" class="oauth-open-app">
+              <app-icon name="arrow_back" [size]="16" />
+              <span>{{ 'auth.callback.successOpenApp' | translate }}</span>
+            </a>
+            <p class="oauth-state__hint">{{ 'auth.callback.successHint' | translate }}</p>
+          </div>
+        }
+
+        <!-- Error -->
+        @if (status() === 'error') {
+          <div class="oauth-state oauth-state--error anim-scale-in">
+            <div class="oauth-state__icon oauth-state__icon--error">
+              <app-icon name="error" [size]="32" />
+            </div>
+            <h3 class="oauth-state__title">{{ 'auth.callback.errorTitle' | translate }}</h3>
+            <p class="oauth-state__body">{{ errorMessage() | translate }}</p>
+            <div class="oauth-state__actions">
+              <app-button variant="secondary" size="md" (click)="returnToApp()">
+                <app-icon name="arrow_back" [size]="14" />
+                {{ 'auth.callback.errorReturn' | translate }}
+              </app-button>
+              <app-button variant="primary" size="md" (click)="startSignIn()">
+                <app-icon name="restart_alt" [size]="14" />
+                {{ 'auth.callback.errorRetry' | translate }}
+              </app-button>
+            </div>
+          </div>
+        }
       </div>
     </div>
   `,
   styles: [`
-    .oauth-container {
+    :host {
+      display: block;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    .oauth-page {
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: #0f172a;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #f1f5f9;
-      padding: 20px;
+      min-height: 100dvh;
+      padding: var(--space-5) var(--space-4);
+      background: var(--app-bg);
+      font-family: var(--font-sans);
+      color: var(--text-base);
+      animation: fade-in var(--motion-base) var(--ease-out-quint) both;
     }
+
     .oauth-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      padding: 40px;
-      border-radius: 16px;
-      width: 100%;
-      max-width: 440px;
-      text-align: center;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      width: min(440px, 100%);
+      padding: var(--space-8) var(--space-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      background: var(--surface-0);
+
+      @media (max-width: 480px) {
+        padding: var(--space-6) var(--space-5);
+        border-radius: var(--radius-lg);
+      }
     }
-    .logo {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: -0.025em;
-      background: linear-gradient(135deg, #38bdf8, #818cf8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 30px;
+
+    /* ---- Brand header ---- */
+    .oauth-card__brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--surface-100);
     }
-    .status-box {
+
+    .oauth-card__logo {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+      color: var(--text-on-brand);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 4px 12px rgba(31, 157, 86, 0.25);
+      flex-shrink: 0;
+    }
+
+    .oauth-card__brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .oauth-card__brand-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-strong);
+      letter-spacing: -0.01em;
+    }
+
+    .oauth-card__brand-tag {
+      font-size: 12px;
+      color: var(--text-subtle);
+    }
+
+    /* ---- State container ---- */
+    .oauth-state {
       display: flex;
       flex-direction: column;
       align-items: center;
+      text-align: center;
+      gap: var(--space-3);
     }
-    .spinner {
-      border: 3px solid #334155;
-      border-top: 3px solid #38bdf8;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 20px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .icon {
-      font-size: 40px;
+
+    .oauth-state__icon {
       width: 64px;
       height: 64px;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      margin-bottom: var(--space-2);
     }
-    .google-icon {
-      background: rgba(59, 130, 246, 0.1);
-      color: #3b82f6;
-      border: 1px solid rgba(59, 130, 246, 0.2);
-      font-weight: bold;
+
+    .oauth-state__icon--loading {
+      background: var(--brand-50);
+      color: var(--brand-600);
+      box-shadow: inset 0 0 0 1px var(--brand-200);
     }
-    .success .icon {
-      background: rgba(16, 185, 129, 0.1);
-      color: #10b981;
-      border: 1px solid rgba(16, 185, 129, 0.2);
+
+    .oauth-state__icon--prompt {
+      background: var(--surface-100);
+      box-shadow: inset 0 0 0 1px var(--surface-200);
     }
-    .error .icon {
-      background: rgba(239, 68, 68, 0.1);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.2);
+
+    .oauth-state__icon--success {
+      background: var(--success-50);
+      color: var(--success-500);
+      box-shadow: inset 0 0 0 1px var(--success-500);
     }
-    h3 {
+
+    .oauth-state__icon--error {
+      background: var(--danger-50);
+      color: var(--danger-500);
+      box-shadow: inset 0 0 0 1px var(--danger-500);
+    }
+
+    .oauth-state__title {
       font-size: 20px;
-      font-weight: 600;
-      margin: 0 0 10px 0;
+      font-weight: 700;
+      color: var(--text-strong);
+      margin: 0;
+      letter-spacing: -0.01em;
     }
-    p {
-      color: #94a3b8;
-      margin: 0 0 20px 0;
-      font-size: 15px;
+
+    .oauth-state__body {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin: 0 0 var(--space-2);
+      max-width: 32ch;
+    }
+
+    .oauth-state__hint {
+      font-size: 12px;
+      color: var(--text-subtle);
+      margin-top: var(--space-2);
       line-height: 1.5;
     }
-    .error-msg {
-      color: #fca5a5;
+
+    .oauth-state__actions {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: var(--space-2);
     }
-    .hint {
-      font-size: 12px;
-      margin-top: 15px;
-      color: #64748b;
+
+    /* ---- Google "G" badge ---- */
+    .oauth-google-g {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      color: #4285f4;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 13px;
+      font-family: var(--font-sans);
+      flex-shrink: 0;
     }
-    .btn-primary {
-      display: inline-block;
-      background: #3b82f6;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
+
+    .oauth-state__icon--prompt .oauth-google-g {
+      width: 32px;
+      height: 32px;
+      font-size: 20px;
+    }
+
+    .oauth-google-g--small {
+      width: 16px;
+      height: 16px;
+      font-size: 11px;
+    }
+
+    .oauth-open-app {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 12px 22px;
+      border-radius: var(--radius-md);
+      background: var(--brand-600);
+      color: var(--text-on-brand);
       font-size: 15px;
       font-weight: 600;
       text-decoration: none;
-      cursor: pointer;
-      transition: background 0.2s;
-      width: 100%;
-      box-sizing: border-box;
+      transition: background var(--motion-fast), box-shadow var(--motion-fast);
+      margin-top: var(--space-1);
     }
-    .btn-primary:hover {
-      background: #2563eb;
+
+    .oauth-open-app:hover {
+      background: var(--brand-700);
+      box-shadow: var(--shadow-sm);
+      text-decoration: none;
     }
-  `]
+
+    .oauth-open-app:active {
+      transform: translateY(1px);
+    }
+  `],
 })
 export class OAuthCallbackPage implements OnInit {
-  private readonly fb = inject(FirebaseService);
+  private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private static readonly REDIRECT_FLAG = 'playforge_oauth_redirect';
 
-  readonly status = signal<'login-prompt' | 'loading' | 'success' | 'error'>('login-prompt');
-  readonly errorMessage = signal<string>('');
+  readonly status = signal<CallbackStatus>('loading');
+  readonly errorMessage = signal<string>('auth.callback.errorDefault');
   readonly deepLinkUrl = signal<string>('');
+  readonly startingRedirect = signal<boolean>(false);
 
   private handled = false;
 
-  async ngOnInit(): Promise<void> {
-    const auth = this.fb.auth;
-    if (!auth) {
+  ngOnInit(): void {
+    if (!this.auth.cloudEnabled) {
       this.status.set('error');
-      this.errorMessage.set('Firebase yapılandırması bulunamadı.');
+      this.errorMessage.set('auth.callback.errorConfig');
       return;
     }
 
     const redirectInProgress = sessionStorage.getItem(OAuthCallbackPage.REDIRECT_FLAG);
-
     if (redirectInProgress) {
-      // We are returning from a Google redirect — process the result.
-      this.status.set('loading');
       sessionStorage.removeItem(OAuthCallbackPage.REDIRECT_FLAG);
-
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          await this.handleUser(result.user);
-          return;
-        }
-      } catch (err: any) {
-        console.error('[OAuthCallback] Redirect result error:', err);
-        this.status.set('error');
-        this.errorMessage.set(err.message || 'Giriş işlemi başarısız.');
-        return;
-      }
-
-      // getRedirectResult returned null — Firebase may still be hydrating.
-      // Fall through to onAuthStateChanged to catch the user.
     }
 
-    // Listen for auth state. Handles two cases:
-    //   1. User already has an active session → send token immediately
-    //   2. Redirect result was null but Firebase hydrates the user shortly after
-    onAuthStateChanged(auth, (user) => {
-      if (user && !this.handled) {
-        void this.handleUser(user);
-      } else if (!user && this.status() !== 'error' && this.status() !== 'success') {
-        this.status.set('login-prompt');
-      }
-    });
+    void this.consumeFlow();
   }
 
-  /**
-   * Triggered ONLY by user click.
-   * Sets a sessionStorage flag BEFORE redirecting so we know,
-   * on return, that we intentionally left. Without the flag
-   * the page just shows the login button — no auto-redirect, no loop.
-   */
-  async tryLogin(): Promise<void> {
-    const auth = this.fb.auth;
-    if (!auth) return;
-
+  private async consumeFlow(): Promise<void> {
     this.status.set('loading');
-    this.errorMessage.set('');
+
+    try {
+      const result = await this.auth.completeOAuthCallbackFlow(8000);
+      if (result) {
+        this.handleSuccess(result.idToken);
+      } else {
+        this.status.set('prompt');
+      }
+    } catch (err) {
+      this.handleError(err);
+    }
+  }
+
+  async startSignIn(): Promise<void> {
+    if (this.startingRedirect()) return;
+    this.startingRedirect.set(true);
 
     try {
       sessionStorage.setItem(OAuthCallbackPage.REDIRECT_FLAG, 'true');
-      await signInWithRedirect(auth, this.fb.googleProvider);
-      // Page will navigate away — this line is never reached.
-    } catch (err: any) {
-      console.error('[OAuthCallback] Redirect initiation failed:', err);
+      await this.auth.signInWithGoogleRedirect();
+    } catch (err) {
       sessionStorage.removeItem(OAuthCallbackPage.REDIRECT_FLAG);
-      this.status.set('error');
-      this.errorMessage.set(err.message || 'Giriş işlemi başlatılamadı.');
+      this.handleError(err);
+    } finally {
+      this.startingRedirect.set(false);
     }
   }
 
-  private async handleUser(user: User): Promise<void> {
+  returnToApp(): void {
+    window.location.href = '/';
+  }
+
+  private handleSuccess(idToken: string): void {
     if (this.handled) return;
     this.handled = true;
 
-    try {
-      const idToken = await user.getIdToken();
-      const url = `playforge://oauth?token=${idToken}`;
-      this.deepLinkUrl.set(url);
-      this.status.set('success');
+    const url = `playforge://oauth?token=${encodeURIComponent(idToken)}`;
+    this.deepLinkUrl.set(url);
+    this.status.set('success');
 
-      // Attempt to open the deep link
+    const timeoutId = window.setTimeout(() => {
       window.location.href = url;
-    } catch (err: any) {
-      console.error('[OAuthCallback] Failed to get ID token:', err);
-      this.handled = false;
-      this.status.set('error');
-      this.errorMessage.set('Token alma işlemi başarısız.');
-    }
+    }, 1200);
+
+    this.destroyRef.onDestroy(() => window.clearTimeout(timeoutId));
+  }
+
+  private handleError(err: unknown): void {
+    const kind: OAuthErrorKind = this.auth.classifyOAuthError(err);
+    this.errorMessage.set(`auth.callback.error${kind.charAt(0).toUpperCase()}${kind.slice(1)}`);
+    this.status.set('error');
   }
 }

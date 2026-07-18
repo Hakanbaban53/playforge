@@ -302,11 +302,41 @@ a:hover { text-decoration: underline; }
 
 button { font-family: inherit; }
 
-/* Global transition on form controls so focus rings and hover states
-   animate on/off consistently, even for inputs that bypass .field
-   (rate-input, notes-input, ctrl__input, tax-item__*, e-field *).
-   The .field input/select/textarea rule below adds the same transition
-   at higher specificity — both are safe; this is the catch-all. */
+button,
+a,
+[role='button'],
+[tabindex],
+input[type='checkbox'],
+input[type='radio'],
+input[type='submit'],
+input[type='button'],
+input[type='reset'],
+label[for],
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible,
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible,
+input[type='submit']:focus-visible,
+input[type='button']:focus-visible,
+input[type='reset']:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--brand-focus-ring);
+  border-radius: inherit;
+}
+
+button:focus,
+a:focus,
+[role='button']:focus {
+  outline: none;
+}
+
 input, select, textarea {
   transition: border-color var(--motion-fast), box-shadow var(--motion-fast),
               background-color var(--motion-fast), color var(--motion-fast);

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, effect } from '@angular/core';
 import {
   ref,
   uploadBytes,
@@ -21,11 +21,10 @@ import { AuthService } from './auth.service';
  * `getDownloadURL()`. The download URL is time-limited (Firebase tokens
  * expire after ~1 hour), so we cache it and refresh on demand.
  *
- * Offline behavior: Firebase Storage has NO built-in offline queue (unlike
- * Firestore). If the upload fails (offline, network error, etc.), this
- * service throws an error — the caller (UploadService) is responsible for
- * surfacing it to the user. We do NOT silently fail or pretend the upload
- * succeeded.
+ * Cache invalidation: the in-memory `urlCache` is cleared on every
+ * logout (driven by `AuthService.logoutEpoch`) so a stale URL from one
+ * user's session is never reused after a different user logs in on the
+ * same device.
  */
 
 /** Prefix for Firebase Storage pseudo-URLs stored in catalog/invoice data. */
@@ -47,10 +46,16 @@ export class FirebaseStorageService {
   private readonly fb = inject(FirebaseService);
   private readonly auth = inject(AuthService);
 
-  /** Download URL cache: Storage path → HTTPS URL. Firebase download URLs
-   *  contain a token that expires (~1 hour), but the URL itself is stable
-   *  for the token's lifetime. We cache and re-fetch on 403/error. */
+  /** Download URL cache: Storage path → HTTPS URL. */
   private readonly urlCache = new Map<string, string>();
+
+  constructor() {
+    effect(() => {
+      const epoch = this.auth.logoutEpoch();
+      if (epoch === 0) return;
+      this.urlCache.clear();
+    });
+  }
 
   /** Upload a file to Firebase Storage. Returns a stable `fbstorage://`
    *  reference that can be stored in Firestore documents.
@@ -67,14 +72,8 @@ export class FirebaseStorageService {
     const path = `users/${uid}/images/${imageId}.${ext}`;
     const storageRef = ref(storage, path);
 
-    // uploadBytes handles the full file in one call. For large files,
-    // we'd use uploadBytesResumable for progress tracking — but images
-    // here are capped at 10 MB by UploadService, so a single-shot upload
-    // is fine.
     await uploadBytes(storageRef, file, { contentType: file.type });
 
-    // Get the download URL immediately so the caller can use it for
-    // preview. We also cache it for future resolveUrl() calls.
     const downloadUrl = await getDownloadURL(storageRef);
     const refStr = buildFirebaseStorageRef(path);
     this.urlCache.set(path, downloadUrl);
@@ -86,16 +85,10 @@ export class FirebaseStorageService {
    *  Caches the result and refreshes on error (token expiry). */
   async resolveUrl(refUrl: string): Promise<string> {
     const parsed = parseFirebaseStorageRef(refUrl);
-    if (!parsed) return refUrl; // Not a fbstorage:// URL — return as-is.
+    if (!parsed) return refUrl;
 
     const cached = this.urlCache.get(parsed.path);
-    if (cached) {
-      // Try the cached URL. If it's expired (403), we'll re-fetch below.
-      // For simplicity, we just return the cached URL — the browser will
-      // show a broken image if it's expired, and the next resolveUrl call
-      // (after cache invalidation) will fetch a fresh one.
-      return cached;
-    }
+    if (cached) return cached;
 
     const storage = this.fb.storage;
     if (!storage) return '';
@@ -128,13 +121,11 @@ export class FirebaseStorageService {
 
   /** Download the raw bytes of a Firebase Storage file via the SDK.
    *
-   *  IMPORTANT: This uses XHR under the hood, which IS subject to CORS.
-   *  You MUST configure CORS on your Firebase Storage bucket for this to
-   *  work from a browser. Run:
+   *  Uses XHR under the hood, which IS subject to CORS. The Firebase
+   *  Storage bucket MUST have CORS configured for this to work from a
+   *  browser. See `cors.json` in the project root and apply with:
    *
    *    gsutil cors set cors.json gs://YOUR_BUCKET.appspot.com
-   *
-   *  See `cors.json` in the project root for the config file.
    *
    *  @param refUrl A `fbstorage://{path}` reference.
    *  @returns The file contents as an ArrayBuffer, or null on failure. */
@@ -148,12 +139,7 @@ export class FirebaseStorageService {
     try {
       return await getBytes(ref(storage, parsed.path), 10 * 1024 * 1024);
     } catch (err) {
-      console.error('[FirebaseStorage] getBytes failed (CORS?) for', refUrl, err);
-      console.error(
-        '[FirebaseStorage] If this is a CORS error, run:\n' +
-        '  gsutil cors set cors.json gs://YOUR_BUCKET.appspot.com\n' +
-        'See cors.json in the project root.'
-      );
+      console.warn('[FirebaseStorage] getBytes failed (CORS?) for', refUrl, err);
       return null;
     }
   }

@@ -128,7 +128,43 @@ export class PdfService {
         }
       }
 
-      // 7. Download.
+      // 7. Download & Open.
+      const isTauri = typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
+      if (isTauri) {
+        try {
+          const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+          const { openPath } = await import('@tauri-apps/plugin-opener');
+          const { downloadDir } = await import('@tauri-apps/api/path');
+
+          const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+          const arrayBuffer = pdf.output('arraybuffer');
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // Save to user's public Downloads directory
+          await writeFile(cleanFileName, uint8Array, { baseDir: BaseDirectory.Download });
+
+          // Automatically open with device's default PDF viewer
+          try {
+            const dir = await downloadDir();
+            const normalizedDir = dir.endsWith('/') ? dir.slice(0, -1) : dir;
+            const fullPath = `${normalizedDir}/${cleanFileName}`;
+            
+            const androidAuth = (window as any).AndroidAuth;
+            if (androidAuth && typeof androidAuth.openPdf === 'function') {
+              androidAuth.openPdf(fullPath);
+            } else {
+              await openPath(fullPath);
+            }
+          } catch (openErr) {
+            console.warn('[PDF] Saved to Downloads, but could not auto-open:', openErr);
+          }
+          return pages.length;
+        } catch (err) {
+          console.error('[PDF] Tauri FS write failed, falling back to web download:', err);
+        }
+      }
+
+      // Fallback for standard web browsers
       const blob = pdf.output('blob');
       this.triggerDownload(blob, fileName);
       return pages.length;

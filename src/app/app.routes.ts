@@ -68,5 +68,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/settings/settings-page').then((m) => m.SettingsPage),
   },
+  {
+    path: 'oauth-callback',
+    title: 'Authentication · PlayForge',
+    loadComponent: () =>
+      import('./features/oauth-callback/oauth-callback').then((m) => m.OAuthCallbackPage),
+  },
   { path: '**', redirectTo: 'catalog' },
 ];

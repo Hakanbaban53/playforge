@@ -9,10 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Google Login Provider**:
+  - Added support for Google authentication.
+  - All settings and customer data are now synced with the Google account on the firebase.
 - **Settings & Catalog Import/Export**:
   - **Global Settings Management**: Added `settings` page to view, import, and export the application's global settings.
   - **JSON Import/Export**: Added full CRUD functionality for global settings and catalog data using JSON files.
   - **Template Download**: Implemented a "Download Customer Template" feature to provide users with a pre-structure for customer data import.
+
+- **Android Support**:
+  - Added support for Android platform.
 
 - **MockDatas**: Added mock datas for testing on development environment.
 

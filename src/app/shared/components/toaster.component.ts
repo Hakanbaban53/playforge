@@ -175,12 +175,13 @@ import { IconComponent } from './icon.component';
       to   { transform: scaleX(0); }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 899px) {
       :host {
-        top: 8px;
-        right: 8px;
-        left: 8px;
+        top: calc(57px + env(safe-area-inset-top, 0px) + 8px);
+        right: 12px;
+        left: 12px;
         width: auto;
+        max-width: calc(100vw - 24px);
       }
     }
   `],

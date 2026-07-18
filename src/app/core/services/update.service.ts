@@ -49,28 +49,25 @@ export class UpdateService {
     void this.checkForUpdates();
   }
 
-  private async setupListener(): Promise<void> {
-    if (!UpdateService.isTauri()) return;
-
-    try {
-      const { listen } = await import('@tauri-apps/api/event');
-      await listen<UpdateInfo>('update-available', (event) => {
-        console.info('[Update] Update event received from backend:', event.payload);
-        this.updateAvailable.set(event.payload);
-      });
-    } catch (err) {
-      console.warn('[Update] Failed to setup listener:', err);
+  /** True if running inside Desktop Tauri (auto-updates only work on Desktop). */
+  static isDesktopTauri(): boolean {
+    if (typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ === 'undefined') {
+      return false;
     }
+    // Mobile platforms (Android / iOS) do not support desktop auto-updater
+    const isMobile = typeof (window as unknown as { AndroidAuth?: unknown }).AndroidAuth !== 'undefined' ||
+                     /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    return !isMobile;
   }
 
-  /** True if running inside Tauri (updates only work in Tauri mode). */
+  /** Alias for isDesktopTauri for backwards compatibility. */
   static isTauri(): boolean {
-    return typeof (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
+    return this.isDesktopTauri();
   }
 
-  /** Check if an update is available. No-op in web mode. */
+  /** Check if an update is available. No-op in web and mobile mode. */
   async checkForUpdates(): Promise<void> {
-    if (!UpdateService.isTauri()) return;
+    if (!UpdateService.isDesktopTauri()) return;
 
     this.checking.set(true);
     this.error.set(null);
@@ -86,9 +83,23 @@ export class UpdateService {
     }
   }
 
-  /** Download and install the update, then restart. No-op in web mode. */
+  private async setupListener(): Promise<void> {
+    if (!UpdateService.isDesktopTauri()) return;
+
+    try {
+      const { listen } = await import('@tauri-apps/api/event');
+      await listen<UpdateInfo>('update-available', (event) => {
+        console.info('[Update] Update event received from backend:', event.payload);
+        this.updateAvailable.set(event.payload);
+      });
+    } catch (err) {
+      console.warn('[Update] Failed to setup listener:', err);
+    }
+  }
+
+  /** Download and install the update, then restart. No-op in web and mobile mode. */
   async downloadAndInstall(): Promise<void> {
-    if (!UpdateService.isTauri()) return;
+    if (!UpdateService.isDesktopTauri()) return;
 
     this.downloading.set(true);
     this.error.set(null);

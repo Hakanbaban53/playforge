@@ -28,14 +28,29 @@
         { "path": "$APPDATA/images/*" },
         { "path": "$APPDATA/images/**" },
         { "path": "$APPDATA/*" },
-        { "path": "$APPDATA/**" }
+        { "path": "$APPDATA/**" },
+        { "path": "$DOWNLOAD/*" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DOCUMENT/*" },
+        { "path": "$DOCUMENT/**" }
       ]
     },
-    "updater:default",
     "process:default",
     "process:allow-restart",
     "window-state:default",
     "core:app:default",
-    "core:path:default"
+    "core:path:default",
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$APPDATA/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "**" }
+      ]
+    },
+    "opener:allow-open-url",
+    "deep-link:default"
   ]
 }

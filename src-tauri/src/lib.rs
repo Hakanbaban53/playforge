@@ -15,8 +15,6 @@
 /// The frontend `UpdateService` (TS) calls these commands only when running
 /// inside Tauri. In web mode, the update UI is hidden.
 use serde::Serialize;
-use tauri::Emitter;
-use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct UpdateInfo {
@@ -34,11 +32,12 @@ pub struct DownloadProgress {
     pub percentage: f64,
 }
 
-/// Check GitHub releases for a newer version.
-/// Returns `None` if the app is up to date.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[tauri::command]
 async fn check_for_updates(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
     log::info!("Checking for updates...");
+    use tauri::Emitter;
+    use tauri_plugin_updater::UpdaterExt;
 
     let updater = match app.updater_builder().build() {
         Ok(u) => u,
@@ -81,9 +80,12 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, 
 
 /// Download and install the update, then restart the app.
 /// Emits progress events during download.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[tauri::command]
 async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Downloading and installing update...");
+    use tauri::Emitter;
+    use tauri_plugin_updater::UpdaterExt;
 
     let updater = app
         .updater_builder()
@@ -135,6 +137,7 @@ async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[allow(unused_mut)]
     let mut builder = tauri::Builder::default();
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -149,76 +152,108 @@ pub fn run() {
         }));
     }
 
-    builder
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    }
+
+    builder = builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
-        .setup(|app| {
-            #[allow(unused_mut)]
-            let mut b = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
-                .title("PlayForge")
-                .inner_size(800.0, 630.0)
-                .resizable(true)
-                .center()
-                .shadow(false)
-                .devtools(true)
-                .min_inner_size(362.0, 240.0);
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init());
 
-            #[cfg(target_os = "windows")]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
+        .setup(|app| {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
-                use tauri::webview::ScrollBarStyle;
-                b = b.scroll_bar_style(ScrollBarStyle::FluentOverlay);
+                #[allow(unused_mut)]
+                let mut b =
+                    tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                        .title("PlayForge")
+                        .inner_size(800.0, 630.0)
+                        .resizable(true)
+                        .center()
+                        .devtools(true)
+                        .shadow(false)
+                        .min_inner_size(362.0, 240.0);
+
+                #[cfg(target_os = "windows")]
+                {
+                    use tauri::webview::ScrollBarStyle;
+                    b = b.scroll_bar_style(ScrollBarStyle::FluentOverlay);
+                }
+
+                let _window = b.build()?;
             }
 
-            let _window = b.build()?;
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                let _window =
+                    tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                        .user_agent("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                        .build()?;
+            }
 
             // Periodic update check every 6 hours (sleeps 6 hours initially)
-            let app_handle = app.handle().clone();
-            std::thread::spawn(move || {
-                loop {
-                    // Sleep 6 hours first, since the frontend checks on startup
-                    std::thread::sleep(std::time::Duration::from_secs(6 * 60 * 60));
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                use tauri::Emitter;
+                use tauri_plugin_updater::UpdaterExt;
 
-                    log::info!("Checking for updates (periodic background thread)...");
-                    let app_handle = app_handle.clone();
-                    tauri::async_runtime::block_on(async move {
-                        let updater = match app_handle.updater_builder().build() {
-                            Ok(u) => u,
-                            Err(e) => {
-                                log::warn!("Periodic updater build failed: {e}");
-                                return;
-                            }
-                        };
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    loop {
+                        // Sleep 6 hours first, since the frontend checks on startup
+                        std::thread::sleep(std::time::Duration::from_secs(6 * 60 * 60));
 
-                        match updater.check().await {
-                            Ok(Some(update)) => {
-                                log::info!("Update available (periodic): v{}", update.version);
-                                let info = UpdateInfo {
-                                    version: update.version.clone(),
-                                    current_version: update.current_version.clone(),
-                                    release_notes: None,
-                                    release_url: None,
-                                    download_size: None,
-                                };
-                                let _ = app_handle.emit("update-available", &info);
+                        log::info!("Checking for updates (periodic background thread)...");
+                        let app_handle = app_handle.clone();
+                        tauri::async_runtime::block_on(async move {
+                            let updater = match app_handle.updater_builder().build() {
+                                Ok(u) => u,
+                                Err(e) => {
+                                    log::warn!("Periodic updater build failed: {e}");
+                                    return;
+                                }
+                            };
+
+                            match updater.check().await {
+                                Ok(Some(update)) => {
+                                    log::info!("Update available (periodic): v{}", update.version);
+                                    let info = UpdateInfo {
+                                        version: update.version.clone(),
+                                        current_version: update.current_version.clone(),
+                                        release_notes: None,
+                                        release_url: None,
+                                        download_size: None,
+                                    };
+                                    let _ = app_handle.emit("update-available", &info);
+                                }
+                                Ok(None) => {
+                                    log::info!("App is up to date (periodic check)");
+                                }
+                                Err(e) => {
+                                    log::warn!("Periodic update check failed: {e}");
+                                }
                             }
-                            Ok(None) => {
-                                log::info!("App is up to date (periodic check)");
-                            }
-                            Err(e) => {
-                                log::warn!("Periodic update check failed: {e}");
-                            }
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                });
+            }
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             check_for_updates,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             download_and_install_update,
         ])
         .run(tauri::generate_context!())

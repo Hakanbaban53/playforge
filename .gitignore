@@ -45,3 +45,7 @@ Thumbs.db
 
 # Angular environment config (contains keys)
 /src/environments/
+
+# Firebase Android credentials
+**/google-services.json
+

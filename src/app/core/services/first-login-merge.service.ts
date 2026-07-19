@@ -5,6 +5,10 @@ import { AuthService } from './auth.service';
 import { Customer } from '../models/customer.model';
 import { ProductFamily, ProductVariant } from '../models/catalog.model';
 import { Invoice } from '../models/invoice.model';
+import { FileStorageAdapter, parseStoredFileRef } from './file-storage.adapter';
+import { ImageSyncQueueService } from './image-sync-queue.service';
+import { ImageMappingsService } from './image-mappings.service';
+import { guessMimeType } from '../utils/mime';
 
 /**
  * First-login merge service.
@@ -37,6 +41,9 @@ export class FirstLoginMergeService {
   private readonly local = inject(LocalDataProvider);
   private readonly activeProvider = inject(DataProvider);
   private readonly auth = inject(AuthService);
+  private readonly fileStorage = inject(FileStorageAdapter);
+  private readonly syncQueue = inject(ImageSyncQueueService);
+  private readonly mappings = inject(ImageMappingsService);
 
   /** True while the merge is in progress (uploading local → cloud). */
   private readonly _merging = signal(false);
@@ -177,6 +184,12 @@ export class FirstLoginMergeService {
         await this.activeProvider.setDoc(Collections.currencyRates, currencyDoc);
       }
 
+      // Scan all merged data for `idb://` image refs and enqueue them
+      // for cloud sync. The refs stay as `idb://local-id` in the
+      // Firestore docs — the sync queue uploads the bytes and writes
+      // a mapping so other devices can resolve them.
+      await this.enqueueLocalImagesForSync(families, variants, invoices, receiptLayoutElements);
+
       // Clear local storage so the device starts fresh.
       await this.clearLocalData();
 
@@ -204,5 +217,113 @@ export class FirstLoginMergeService {
     }
     keys.forEach((k) => localStorage.removeItem(k));
     return Promise.resolve();
+  }
+
+  /**
+   * Scan all merged data for `idb://` image refs and enqueue them for
+   * cloud sync.
+   *
+   * When a user signs in with existing local data, the data (and its
+   * `idb://` refs) is copied to Firestore. But the image bytes only
+   * exist in local IDB — they were never uploaded because the user was
+   * signed out. This method collects all `idb://` refs from the merged
+   * data, reads their bytes from local IDB, and enqueues upload
+   * operations in the sync queue. The sync queue flushes when online,
+   * uploads to Storage, and writes a mapping doc so other devices can
+   * resolve the same `idb://` ref.
+   *
+   * The refs in Firestore docs stay as `idb://local-id` — they don't
+   * change. The mapping collection bridges local → cloud.
+   *
+   * Skips refs that already have a mapping (image already synced from
+   * another device) — avoids redundant uploads + orphaned cloud images.
+   */
+  private async enqueueLocalImagesForSync(
+    families: ProductFamily[],
+    variants: ProductVariant[],
+    invoices: Invoice[],
+    receiptLayoutElements: unknown[] | null,
+  ): Promise<void> {
+    const refs = this.collectImageRefs(families, variants, invoices, receiptLayoutElements);
+    if (refs.size === 0) return;
+
+    // Read bytes + check mappings IN PARALLEL — much faster than
+    // sequential for users with many images.
+    const entries = await Promise.all(
+      Array.from(refs).map(async (ref) => {
+        const parsed = parseStoredFileRef(ref);
+        if (!parsed) return null;
+        const localId = parsed.id;
+
+        // Skip if mapping already exists (image already synced from
+        // another device — no point re-uploading).
+        const existingCloudPath = this.mappings.getCloudPath(localId);
+        if (existingCloudPath) return null;
+
+        const bytes = await this.fileStorage.readBytes({ id: localId, name: '', mimeType: '', size: 0 });
+        if (!bytes) {
+          console.warn('[FirstLoginMerge] Image bytes not found in IDB for', ref);
+          return null;
+        }
+
+        const mime = guessMimeType(ref);
+        const filename = `${localId}.${mime.split('/')[1] ?? 'bin'}`;
+        return { localId, bytes, filename, mime };
+      }),
+    );
+
+    // Enqueue the valid entries.
+    for (const entry of entries) {
+      if (!entry) continue;
+      await this.syncQueue.enqueueUpload(entry);
+    }
+  }
+
+  /** Collect all `idb://` refs from merged data into a Set (deduped). */
+  private collectImageRefs(
+    families: ProductFamily[],
+    variants: ProductVariant[],
+    invoices: Invoice[],
+    receiptLayoutElements: unknown[] | null,
+  ): Set<string> {
+    const refs = new Set<string>();
+
+    for (const f of families) {
+      for (const img of f.images ?? []) {
+        if (parseStoredFileRef(img.url)) refs.add(img.url);
+      }
+    }
+
+    for (const v of variants) {
+      for (const ov of v.overrides ?? []) {
+        if (ov.key === 'images' && Array.isArray(ov.value)) {
+          for (const img of ov.value) {
+            if (parseStoredFileRef(img.url)) refs.add(img.url);
+          }
+        }
+      }
+    }
+
+    for (const inv of invoices) {
+      for (const line of inv.lines ?? []) {
+        if (line.imageUrl && parseStoredFileRef(line.imageUrl)) {
+          refs.add(line.imageUrl);
+        }
+      }
+    }
+
+    if (receiptLayoutElements) {
+      for (const el of receiptLayoutElements) {
+        if (typeof el !== 'object' || el === null) continue;
+        const content = (el as { content?: unknown }).content;
+        if (typeof content !== 'string') continue;
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim();
+          if (parseStoredFileRef(trimmed)) refs.add(trimmed);
+        }
+      }
+    }
+
+    return refs;
   }
 }

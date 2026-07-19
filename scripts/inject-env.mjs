@@ -37,6 +37,7 @@ const {
   FB_MESSAGING_SENDER_ID,
   FB_APP_ID,
   FB_MEASUREMENT_ID,
+  FB_WEB_CLIENT_ID,
 } = process.env;
 
 const hasEnvVars = 
@@ -46,7 +47,8 @@ const hasEnvVars =
   FB_STORAGE_BUCKET || 
   FB_MESSAGING_SENDER_ID || 
   FB_APP_ID || 
-  FB_MEASUREMENT_ID;
+  FB_MEASUREMENT_ID ||
+  FB_WEB_CLIENT_ID;
 
 // If we are running locally and environment.ts already exists,
 // don't overwrite it unless environment variables are provided.
@@ -77,7 +79,8 @@ export const environment = {
     storageBucket: ${JSON.stringify(FB_STORAGE_BUCKET || '')},
     messagingSenderId: ${JSON.stringify(FB_MESSAGING_SENDER_ID || '')},
     appId: ${JSON.stringify(FB_APP_ID || '')},
-    measurementId: ${JSON.stringify(FB_MEASUREMENT_ID || '')}
+    measurementId: ${JSON.stringify(FB_MEASUREMENT_ID || '')},
+    webClientId: ${JSON.stringify(FB_WEB_CLIENT_ID || '')}
   },
 };
 `;

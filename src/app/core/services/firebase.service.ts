@@ -13,6 +13,8 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  disableNetwork,
+  enableNetwork,
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -56,6 +58,24 @@ export class FirebaseService {
   private _storage: FirebaseStorageType | null = null;
   private _initialized = false;
 
+  /**
+   * Single source of truth for the Firestore network state.
+   *
+   * `true` when the network has been explicitly disabled (offline).
+   * `FirestoreDataProvider` reads this instead of maintaining its own
+   * flag — avoids two independent states drifting out of sync.
+   *
+   * Initialized to match `navigator.onLine` at construction time. If
+   * the app launches offline, `ensureInitialized()` calls
+   * `disableNetwork()` immediately (before any onSnapshot attaches).
+   */
+  private _networkDisabled = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  /** True if the Firestore network is currently disabled (offline). */
+  get networkDisabled(): boolean {
+    return this._networkDisabled;
+  }
+
   /** True if `environment.firebase.enabled` is `true` AND initialization
    *  succeeded. Use this to gate cloud-only UI. */
   readonly enabled = environment.firebase.enabled === true;
@@ -84,11 +104,23 @@ export class FirebaseService {
             tabManager: persistentMultipleTabManager(),
           }),
         });
-      } catch {
-        // initializeFirestore throws if persistence is already enabled
-        // (e.g. Hot Module Reload during dev). Fall back to getFirestore,
-        // which returns the existing instance.
+      } catch (err) {
+        // initializeFirestore throws if the Firestore instance for this
+        // app already exists (e.g. Hot Module Reload during dev).
+        // getFirestore() returns that existing instance.
+        console.warn('[Firebase] initializeFirestore fell back to getFirestore:', err);
         this._firestore = getFirestore(this.app);
+      }
+
+      // If the app launches while offline, disable the Firestore network
+      // IMMEDIATELY — before any onSnapshot listener can attach. This
+      // prevents the SDK from trying to open the Listen stream, which
+      // would spam "transport errored" warnings until disableNetwork()
+      // takes effect.
+      if (this._networkDisabled) {
+        void disableNetwork(this._firestore).catch((err) => {
+          console.warn('[Firebase] Initial disableNetwork failed:', err);
+        });
       }
 
       this._storage = getStorage(this.app);
@@ -101,6 +133,36 @@ export class FirebaseService {
     }
 
     return this.app;
+  }
+
+  /**
+   * Enable or disable the Firestore SDK's network connection. Single
+   * source of truth — `FirestoreDataProvider` delegates here instead
+   * of maintaining its own flag.
+   *
+   * When disabled, the SDK serves reads from the local cache and
+   * queues writes locally — `setDoc()` / `deleteDoc()` promises
+   * resolve immediately after the local IndexedDB commit, with no
+   * retry-loop delay.
+   */
+  async setNetworkEnabled(enabled: boolean): Promise<void> {
+    if (!this._firestore) return;
+
+    if (enabled && this._networkDisabled) {
+      try {
+        await enableNetwork(this._firestore);
+        this._networkDisabled = false;
+      } catch (err) {
+        console.warn('[Firebase] enableNetwork failed:', err);
+      }
+    } else if (!enabled && !this._networkDisabled) {
+      try {
+        await disableNetwork(this._firestore);
+        this._networkDisabled = true;
+      } catch (err) {
+        console.warn('[Firebase] disableNetwork failed:', err);
+      }
+    }
   }
 
   get auth(): Auth | null {

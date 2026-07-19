@@ -126,6 +126,11 @@ export class InMemoryFileStorageAdapter implements FileStorageAdapter {
     return { id, name: file.name, mimeType: file.type, size: file.size };
   }
 
+  async saveWithId(id: string, bytes: ArrayBuffer, mimeType: string, filename: string): Promise<StoredFile> {
+    this.files.set(id, { name: filename, mimeType, size: bytes.byteLength, bytes });
+    return { id, name: filename, mimeType, size: bytes.byteLength };
+  }
+
   resolveUrl(stored: StoredFile): Promise<string> {
     return Promise.resolve(`blob:test/${stored.id}`);
   }
@@ -136,6 +141,10 @@ export class InMemoryFileStorageAdapter implements FileStorageAdapter {
 
   async delete(stored: StoredFile): Promise<void> {
     this.files.delete(stored.id);
+  }
+
+  async clearAll(): Promise<void> {
+    this.files.clear();
   }
 }
 

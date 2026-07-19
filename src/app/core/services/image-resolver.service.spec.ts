@@ -3,141 +3,191 @@ import { vi, Mock } from 'vitest';
 import 'fake-indexeddb/auto';
 import { ImageResolverService } from './image-resolver.service';
 import { FirebaseStorageService } from './firebase-storage.service';
+import { ImageMappingsService } from './image-mappings.service';
 import { AuthService } from './auth.service';
-import { FileStorageAdapter } from './file-storage.adapter';
+import { FileStorageAdapter, StoredFile } from './file-storage.adapter';
 import { StubAuthService, InMemoryFileStorageAdapter } from './testing';
 
 /**
- * ImageResolverService auth-gate + cache-clear regression tests.
+ * ImageResolverService — local-first resolution tests.
  *
- * These cover the bug where `resolved-img.component.ts`'s effect calls
- * `image-resolver.service.ts` → `firebase-storage.service.ts` →
- * `getDownloadURL()`, and that request was still in flight at the
- * moment the component was destroyed during logout. The fix has three
- * parts, each tested here:
- *
- *   1. Auth gate: `resolve(fbstorage://...)` returns '' when not
- *      authenticated — skips the doomed Storage call entirely.
- *   2. Cache clearing: `clearCache()` is called on logout, so a
- *      cached URL from user A's session is never reused for user B.
- *   3. In-flight dedup: `resolve()` for the same URL reuses the
- *      in-flight promise (no duplicate Storage calls).
+ * Covers:
+ *   - idb:// resolves from local IDB (instant, offline-capable)
+ *   - idb:// not in local IDB → mapping → cloud fetch flow
+ *   - idb:// not in local IDB, no mapping → '' (no network spam)
+ *   - fbstorage:// backward compat (cloud fetch)
+ *   - auth gate: cloud fetches only when authenticated
+ *   - cache clearing on logout
+ *   - in-flight dedup
  */
-describe('ImageResolverService — auth + cache regression tests', () => {
+describe('ImageResolverService', () => {
   let resolver: ImageResolverService;
   let auth: StubAuthService;
-  let fbStorage: { resolveUrl: Mock; getBytes: Mock; urlCache: Map<string, string> };
+  let fileAdapter: InMemoryFileStorageAdapter;
+  let fbStorage: { getBytes: Mock };
+  let mappings: { getCloudPath: Mock; ensureListener: Mock };
 
   beforeEach(() => {
     auth = new StubAuthService();
+    fileAdapter = new InMemoryFileStorageAdapter();
     fbStorage = {
-      resolveUrl: vi.fn().mockResolvedValue('https://firebasestorage.example.com/img.png?token=abc'),
       getBytes: vi.fn().mockResolvedValue(null),
-      urlCache: new Map(),
     };
-    const fileAdapter = new InMemoryFileStorageAdapter();
+    mappings = {
+      getCloudPath: vi.fn().mockReturnValue(undefined),
+      ensureListener: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
         ImageResolverService,
         { provide: FileStorageAdapter, useValue: fileAdapter },
         { provide: FirebaseStorageService, useValue: fbStorage },
+        { provide: ImageMappingsService, useValue: mappings },
         { provide: AuthService, useValue: auth },
       ],
     });
     resolver = TestBed.inject(ImageResolverService);
   });
 
-  describe('auth gate', () => {
-    it('returns "" for fbstorage:// when not authenticated', async () => {
+  describe('idb:// resolution (local-first)', () => {
+    it('resolves from local IDB instantly', async () => {
+      // Save an image to local IDB first.
+      const file = new File([new Uint8Array([1, 2, 3, 4])], 'photo.png', { type: 'image/png' });
+      const stored = await fileAdapter.save(file);
+      const ref = `idb://${stored.id}`;
+
+      const url = await resolver.resolve(ref);
+      expect(url.startsWith('blob:')).toBe(true);
+      // No cloud fetch — local IDB hit.
+      expect(fbStorage.getBytes).not.toHaveBeenCalled();
+    });
+
+    it('returns "" when not in local IDB and no mapping (no network spam)', async () => {
+      auth.setUser(null);
+      const url = await resolver.resolve('idb://nonexistent');
+      expect(url).toBe('');
+      // No cloud fetch attempted (no auth).
+      expect(fbStorage.getBytes).not.toHaveBeenCalled();
+    });
+
+    it('returns "" when authenticated but no mapping exists', async () => {
+      auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
+      mappings.getCloudPath.mockReturnValue(undefined);
+
+      const url = await resolver.resolve('idb://nonexistent');
+      expect(url).toBe('');
+      // Mapping listener was ensured (lazy attach).
+      expect(mappings.ensureListener).toHaveBeenCalled();
+      // No cloud fetch — no mapping to fetch from.
+      expect(fbStorage.getBytes).not.toHaveBeenCalled();
+    });
+
+    it('fetches from cloud via mapping when not in local IDB', async () => {
+      auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
+      const cloudPath = 'users/uid-1/images/img-123.png';
+      mappings.getCloudPath.mockReturnValue(cloudPath);
+      const cloudBytes = new ArrayBuffer(4);
+      fbStorage.getBytes.mockResolvedValue(cloudBytes);
+
+      const url = await resolver.resolve('idb://from-other-device');
+      expect(url.startsWith('blob:')).toBe(true);
+      expect(mappings.ensureListener).toHaveBeenCalled();
+      expect(fbStorage.getBytes).toHaveBeenCalledWith(cloudPath);
+    });
+
+    it('REGRESSION: cross-device image is cached in local IDB for future resolves', async () => {
+      // Bug: cloud-fetched images weren't saved to IDB, so every page
+      // reload re-fetched from cloud. Fix: saveWithId caches them.
+      auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
+      const cloudPath = 'users/uid-1/images/img-cache.png';
+      mappings.getCloudPath.mockReturnValue(cloudPath);
+      const cloudBytes = new TextEncoder().encode('cloud-image-bytes').buffer as ArrayBuffer;
+      fbStorage.getBytes.mockResolvedValue(cloudBytes);
+
+      const localId = 'cross-device-cache-test';
+      const ref = `idb://${localId}`;
+
+      // First resolve — fetches from cloud.
+      const url1 = await resolver.resolve(ref);
+      expect(url1.startsWith('blob:')).toBe(true);
+      expect(fbStorage.getBytes).toHaveBeenCalledTimes(1);
+
+      // Verify the bytes were saved to local IDB via saveWithId.
+      const stored: StoredFile = { id: localId, name: '', mimeType: '', size: 0 };
+      const cachedBytes = await fileAdapter.readBytes(stored);
+      expect(cachedBytes).toBeTruthy();
+      expect(cachedBytes!.byteLength).toBe(cloudBytes.byteLength);
+    });
+  });
+
+  describe('fbstorage:// backward compat', () => {
+    it('returns "" when not authenticated', async () => {
       auth.setUser(null);
       const url = await resolver.resolve('fbstorage://users/uid-1/images/img-1.png');
       expect(url).toBe('');
-      expect(fbStorage.resolveUrl).not.toHaveBeenCalled();
+      expect(fbStorage.getBytes).not.toHaveBeenCalled();
     });
 
-    it('resolves fbstorage:// when authenticated', async () => {
+    it('fetches from cloud when authenticated', async () => {
       auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
+      fbStorage.getBytes.mockResolvedValue(new ArrayBuffer(4));
+
       const url = await resolver.resolve('fbstorage://users/uid-1/images/img-1.png');
-      expect(url).toBe('https://firebasestorage.example.com/img.png?token=abc');
-      expect(fbStorage.resolveUrl).toHaveBeenCalledTimes(1);
+      expect(url.startsWith('blob:')).toBe(true);
+      expect(fbStorage.getBytes).toHaveBeenCalledWith('users/uid-1/images/img-1.png');
     });
+  });
 
-    it('always resolves idb:// regardless of auth state', async () => {
-      auth.setUser(null);
-      const url = await resolver.resolve('idb://test-id');
-      // InMemoryFileStorageAdapter returns a blob: URL.
-      expect(url.startsWith('blob:test/')).toBe(true);
-    });
-
-    it('passes through http(s) URLs regardless of auth state', async () => {
+  describe('passthrough', () => {
+    it('passes through https URLs', async () => {
       auth.setUser(null);
       const url = await resolver.resolve('https://example.com/a.jpg');
       expect(url).toBe('https://example.com/a.jpg');
     });
+
+    it('passes through data: URIs', async () => {
+      auth.setUser(null);
+      const url = await resolver.resolve('data:image/png;base64,abc');
+      expect(url).toBe('data:image/png;base64,abc');
+    });
   });
 
   describe('in-flight dedup', () => {
-    it('dedupes concurrent resolve() calls for the same fbstorage:// URL', async () => {
-      auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
-      const url = 'fbstorage://users/uid-1/images/img-1.png';
-      const [a, b] = await Promise.all([resolver.resolve(url), resolver.resolve(url)]);
+    it('dedupes concurrent resolve() calls for the same idb:// URL', async () => {
+      const file = new File([new Uint8Array([1])], 'p.png', { type: 'image/png' });
+      const stored = await fileAdapter.save(file);
+      const ref = `idb://${stored.id}`;
+
+      const [a, b] = await Promise.all([resolver.resolve(ref), resolver.resolve(ref)]);
       expect(a).toBe(b);
-      expect(fbStorage.resolveUrl).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('cache clearing on logout', () => {
     it('clearCache() removes cached URLs', async () => {
-      auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
-      const url = 'fbstorage://users/uid-1/images/img-1.png';
-      await resolver.resolve(url);
-      expect(resolver.getCached(url)).toBeTruthy();
+      const file = new File([new Uint8Array([1])], 'p.png', { type: 'image/png' });
+      const stored = await fileAdapter.save(file);
+      const ref = `idb://${stored.id}`;
+
+      await resolver.resolve(ref);
+      expect(resolver.getCached(ref)).toBeTruthy();
 
       resolver.clearCache();
-      expect(resolver.getCached(url)).toBe('');
+      expect(resolver.getCached(ref)).toBe('');
     });
 
     it('logoutEpoch bump triggers clearCache() via the constructor effect', async () => {
-      auth.setUser({ uid: 'uid-1', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
-      const url = 'fbstorage://users/uid-1/images/img-1.png';
-      await resolver.resolve(url);
-      expect(resolver.getCached(url)).toBeTruthy();
+      const file = new File([new Uint8Array([1])], 'p.png', { type: 'image/png' });
+      const stored = await fileAdapter.save(file);
+      const ref = `idb://${stored.id}`;
+
+      await resolver.resolve(ref);
+      expect(resolver.getCached(ref)).toBeTruthy();
 
       auth.bumpLogoutEpoch('explicit');
       TestBed.flushEffects();
-      // The constructor's effect() should have fired clearCache.
-      expect(resolver.getCached(url)).toBe('');
-    });
-
-    it('after logout, a cached URL from user A is NOT reused for user B', async () => {
-      // User A resolves a URL.
-      auth.setUser({ uid: 'uid-A', email: 'a@b.co', displayName: null, photoURL: null, justSignedIn: false });
-      const urlA = 'fbstorage://users/uid-A/images/secret.png';
-      await resolver.resolve(urlA);
-
-      // User A logs out.
-      auth.bumpLogoutEpoch('explicit');
-      TestBed.flushEffects();
-      auth.setUser(null);
-
-      // User B logs in on the same device and somehow references user A's URL
-      // (e.g. via a stale Firestore doc that wasn't migrated). The cache
-      // should be empty — the second resolve() should hit Storage fresh,
-      // and Storage should reject it because user B doesn't own that path.
-      auth.setUser({ uid: 'uid-B', email: 'b@c.co', displayName: null, photoURL: null, justSignedIn: false });
-      fbStorage.resolveUrl.mockRejectedValueOnce(new Error('storage/unauthorized'));
-      const result = await resolver.resolve(urlA);
-      expect(result).toBe('');
-    });
-  });
-
-  describe('resolveToDataUri() — auth gate', () => {
-    it('returns "" for fbstorage:// when not authenticated', async () => {
-      auth.setUser(null);
-      const dataUri = await resolver.resolveToDataUri('fbstorage://users/uid-1/images/img-1.png');
-      expect(dataUri).toBe('');
-      expect(fbStorage.getBytes).not.toHaveBeenCalled();
+      expect(resolver.getCached(ref)).toBe('');
     });
   });
 });

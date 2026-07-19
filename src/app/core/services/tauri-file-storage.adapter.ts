@@ -93,24 +93,28 @@ export class TauriFileStorageAdapter extends FileStorageAdapter {
   }
 
   async save(file: File): Promise<StoredFile> {
+    const id = `tauri-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const bytes = await file.arrayBuffer();
+    return this.persistWithId(id, bytes, file.type, file.name);
+  }
+
+  async saveWithId(id: string, bytes: ArrayBuffer, mimeType: string, filename: string): Promise<StoredFile> {
+    return this.persistWithId(id, bytes, mimeType, filename);
+  }
+
+  private async persistWithId(
+    id: string,
+    bytes: ArrayBuffer,
+    mimeType: string,
+    filename: string,
+  ): Promise<StoredFile> {
     const fs = await this.getFs();
     const dir = await this.getImagesDir();
-
-    const id = `tauri-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const ext = this.ext(file.name);
-    const filename = `${id}${ext}`;
-    const filepath = `${dir}/${filename}`;
-
-    // Read file bytes and write to disk.
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await fs.writeFile(filepath, bytes);
-
-    return {
-      id,
-      name: file.name,
-      mimeType: file.type,
-      size: file.size,
-    };
+    const ext = this.ext(filename);
+    const diskFilename = `${id}${ext}`;
+    const filepath = `${dir}/${diskFilename}`;
+    await fs.writeFile(filepath, new Uint8Array(bytes));
+    return { id, name: filename, mimeType, size: bytes.byteLength };
   }
 
   async resolveUrl(stored: StoredFile): Promise<string> {
@@ -147,6 +151,21 @@ export class TauriFileStorageAdapter extends FileStorageAdapter {
       await fs.remove(filepath);
     } catch {
       // file may not exist — fine
+    }
+  }
+
+  async clearAll(): Promise<void> {
+    const fs = await this.getFs();
+    const dir = await this.getImagesDir();
+    try {
+      const entries = await fs.readDir(dir);
+      for (const entry of entries) {
+        if (entry.isFile) {
+          await fs.remove(`${dir}/${entry.name}`).catch(() => undefined);
+        }
+      }
+    } catch {
+      // dir may not exist — fine
     }
   }
 }

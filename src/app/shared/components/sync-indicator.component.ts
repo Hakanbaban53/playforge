@@ -1,9 +1,21 @@
 import { Component, inject, computed } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 import { DataProvider } from '../../core/services/data-provider';
+import { ImageSyncQueueService } from '../../core/services/image-sync-queue.service';
 import { IconComponent } from './icon.component';
 import { SpinnerComponent } from './spinner.component';
 
+/**
+ * Sync status indicator — reflects Firestore sync state AND image
+ * sync queue state.
+ *
+ * The indicator shows "syncing" when EITHER:
+ *   - Firestore has pending writes (documents being synced), OR
+ *   - The image sync queue is processing items (uploads/deletes).
+ *
+ * This gives the user unified feedback: any cloud sync activity
+ * (document writes or image uploads) shows the syncing state.
+ */
 @Component({
   selector: 'app-sync-indicator',
   standalone: true,
@@ -56,8 +68,20 @@ import { SpinnerComponent } from './spinner.component';
 })
 export class SyncIndicatorComponent {
   private readonly data = inject(DataProvider);
+  private readonly imageSync = inject(ImageSyncQueueService);
 
-  readonly state = computed(() => this.data.syncState());
+  /** Combined sync state: Firestore + image sync queue. */
+  readonly state = computed(() => {
+    const firestoreState = this.data.syncState();
+    const imageActive = this.imageSync.activeCount();
+    const imageSyncing = this.imageSync.isSyncing();
+
+    // Image sync activity overrides to 'syncing'.
+    if (imageSyncing || imageActive > 0) {
+      return 'syncing' as const;
+    }
+    return firestoreState;
+  });
 
   readonly iconName = computed<string>(() => {
     switch (this.state()) {
@@ -81,8 +105,14 @@ export class SyncIndicatorComponent {
 
   readonly tooltip = computed<string>(() => {
     const s = this.state();
+    const imageActive = this.imageSync.activeCount();
     if (s === 'local') return 'Data is saved only on this device. Sign in to sync across devices.';
-    if (s === 'syncing') return 'Saving changes to the cloud…';
+    if (s === 'syncing') {
+      if (imageActive > 0) {
+        return `Syncing ${imageActive} image(s) to the cloud…`;
+      }
+      return 'Saving changes to the cloud…';
+    }
     if (s === 'offline') return 'Offline — changes will sync when reconnected.';
     return 'All changes saved to the cloud.';
   });

@@ -61,17 +61,27 @@ export class BrowserFileStorageAdapter extends FileStorageAdapter {
 
   async save(file: File): Promise<StoredFile> {
     const id = `idb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const bytes = await file.arrayBuffer();
+    return this.persistWithId(id, bytes, file.type, file.name);
+  }
+
+  async saveWithId(id: string, bytes: ArrayBuffer, mimeType: string, filename: string): Promise<StoredFile> {
+    return this.persistWithId(id, bytes, mimeType, filename);
+  }
+
+  /** Shared persist logic for `save` (auto-id) and `saveWithId` (caller id). */
+  private async persistWithId(
+    id: string,
+    bytes: ArrayBuffer,
+    mimeType: string,
+    filename: string,
+  ): Promise<StoredFile> {
     const stored: StoredFile = {
       id,
-      name: file.name,
-      mimeType: file.type,
-      size: file.size,
+      name: filename,
+      mimeType,
+      size: bytes.byteLength,
     };
-    // Store the file as raw bytes (ArrayBuffer) rather than as a Blob —
-    // structured cloning of Blob across IndexedDB boundaries can lose the
-    // Blob type in some environments (e.g. jsdom), and storing bytes is
-    // also closer to how Tauri's `fs` plugin works.
-    const bytes = await file.arrayBuffer();
     const db = await this.dbPromise;
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(this.storeName, 'readwrite');
@@ -114,6 +124,21 @@ export class BrowserFileStorageAdapter extends FileStorageAdapter {
       URL.revokeObjectURL(url);
       this.urlCache.delete(stored.id);
     }
+  }
+
+  async clearAll(): Promise<void> {
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(new Error(String(tx.error)));
+    });
+    // Revoke all cached blob URLs.
+    for (const url of this.urlCache.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.urlCache.clear();
   }
 
   /** Read the raw ArrayBuffer from IndexedDB by id. */

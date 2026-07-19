@@ -4,6 +4,8 @@ import { CustomersService } from './customers.service';
 import { InvoiceService } from './invoice.service';
 import { FavoritesService } from './favorites.service';
 import { InvoiceDefaultsService } from './invoice-defaults.service';
+import { FileStorageAdapter } from './file-storage.adapter';
+import { ImageSyncQueueService } from './image-sync-queue.service';
 import {
   Part,
   ProductFamily,
@@ -49,6 +51,8 @@ export class MockDataService {
   private readonly invoiceService = inject(InvoiceService);
   private readonly favorites = inject(FavoritesService);
   private readonly defaults = inject(InvoiceDefaultsService);
+  private readonly fileStorage = inject(FileStorageAdapter);
+  private readonly syncQueue = inject(ImageSyncQueueService);
 
   /** Prefix used on every mock family code so we can detect & refresh. */
   static readonly MOCK_PREFIX = 'MOCK-';
@@ -202,6 +206,10 @@ export class MockDataService {
     await this.favorites.clear();
     await this.clearAllSavedInvoices();
     await this.clearActiveInvoice();
+    // Also wipe local IDB images + the sync queue so orphaned images
+    // don't linger after a "reset to clean slate".
+    await this.syncQueue.clear();
+    await this.fileStorage.clearAll();
   }
 
   // Live counts (consumed by the DevTools UI)

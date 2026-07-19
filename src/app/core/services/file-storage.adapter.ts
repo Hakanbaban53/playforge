@@ -44,6 +44,20 @@ export abstract class FileStorageAdapter {
   abstract save(file: File): Promise<StoredFile>;
 
   /**
+   * Persist raw bytes under a SPECIFIC id (no auto-generated id).
+   *
+   * Used by the cross-device image flow: when Cihaz B fetches a cloud
+   * image (originally uploaded from Cihaz A), it caches the bytes in
+   * its own local IDB under the ORIGINAL localId. This way, future
+   * resolves of the same `idb://local-id` ref hit the local IDB
+   * instead of re-fetching from cloud on every page load.
+   *
+   * Implementations should overwrite if a file with the same id already
+   * exists (idempotent — safe to call multiple times for the same id).
+   */
+  abstract saveWithId(id: string, bytes: ArrayBuffer, mimeType: string, filename: string): Promise<StoredFile>;
+
+  /**
    * Resolve a stored file to a URL the browser can use in `<img src>`,
    * canvas drawImage, etc. The URL is platform-specific:
    *   - Web: `blob:` URL (valid for the lifetime of the page)
@@ -62,6 +76,10 @@ export abstract class FileStorageAdapter {
 
   /** Delete a stored file. */
   abstract delete(stored: StoredFile): Promise<void>;
+
+  /** Wipe ALL stored files. Used by dev-tools "wipe all" and logout
+   *  (user-scoped data). Implementations should clear the entire store. */
+  abstract clearAll(): Promise<void>;
 }
 
 /**

@@ -6,7 +6,7 @@ import { StubAuthService } from './testing';
 
 /**
  * FirebaseStorageService tests — covers the URL-parsing helpers and
- * the logout cache-clear regression.
+ * the offline/unavailable error paths.
  *
  * The Storage SDK itself (`getDownloadURL`, `uploadBytes`, `getBytes`)
  * is NOT exercised here — that requires a real Firebase project.
@@ -68,27 +68,22 @@ describe('FirebaseStorageService', () => {
       service = TestBed.inject(FirebaseStorageService);
     });
 
-    it('resolveUrl() returns "" when Firebase storage is unavailable', async () => {
-      const url = await service.resolveUrl('fbstorage://users/uid-1/images/img-1.png');
-      expect(url).toBe('');
-    });
-
     it('getBytes() returns null when Firebase storage is unavailable', async () => {
-      const bytes = await service.getBytes('fbstorage://users/uid-1/images/img-1.png');
+      const bytes = await service.getBytes('users/uid-1/images/img-1.png');
       expect(bytes).toBeNull();
-    });
-
-    it('delete() is a no-op when Firebase storage is unavailable', async () => {
-      await expect(service.delete('fbstorage://users/uid-1/images/img-1.png')).resolves.toBeUndefined();
     });
 
     it('available is false when Firebase is disabled', () => {
       expect(service.available).toBe(false);
     });
 
-    it('resolveUrl() returns input unchanged for non-fbstorage URLs', async () => {
-      const url = await service.resolveUrl('https://example.com/img.png');
-      expect(url).toBe('https://example.com/img.png');
+    it('upload() throws when not signed in', async () => {
+      await expect(service.upload(new File([new Uint8Array([1])], 'p.png', { type: 'image/png' })))
+        .rejects.toThrow('Not signed in');
+    });
+
+    it('deleteByPath() is a no-op when Firebase storage is unavailable', async () => {
+      await expect(service.deleteByPath('users/uid-1/images/img-1.png')).resolves.toBeUndefined();
     });
   });
 });

@@ -177,7 +177,7 @@ import { IconComponent } from './icon.component';
 
     @media (max-width: 899px) {
       :host {
-        top: calc(57px + env(safe-area-inset-top, 0px) + 8px);
+        top: calc(57px + max(env(safe-area-inset-top, 10px), 10px) + 8px);
         right: 12px;
         left: 12px;
         width: auto;

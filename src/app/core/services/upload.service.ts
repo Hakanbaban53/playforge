@@ -1,13 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import { FileStorageAdapter, StoredFile, parseStoredFileRef } from './file-storage.adapter';
-import { FirebaseStorageService, parseFirebaseStorageRef } from './firebase-storage.service';
+import { FirebaseStorageService } from './firebase-storage.service';
+import { ImageMappingsService } from './image-mappings.service';
+import { ImageSyncQueueService } from './image-sync-queue.service';
 import { AuthService } from './auth.service';
 
 export interface UploadedFile {
   /**
-   * Stable URL reference that survives page reloads. Format:
-   *   - Logged out: `idb://<id>` — resolved to a `blob:` URL on demand.
-   *   - Logged in: `fbstorage://<path>` — resolved to a Firebase download URL.
+   * Stable URL reference that survives page reloads. ALWAYS `idb://<id>`.
+   *
+   * Documents carry this ref. Cloud path is NEVER written to documents —
+   * it lives only in the `image-mappings` Firestore collection. This is
+   * the local-first principle: local IDB is the source of truth, cloud
+   * is a mirror.
    */
   url: string;
   stored: StoredFile;
@@ -17,22 +22,26 @@ export interface UploadedFile {
 }
 
 /**
- * Image upload service — auth-aware.
+ * Image upload service — local-first, auth-aware.
  *
- * When the user is NOT signed in: images go to IndexedDB via
- * `BrowserFileStorageAdapter` and return `idb://` references. Fully
- * local, no cloud.
+ * Routing matrix:
  *
- * When the user IS signed in: images go to Firebase Storage under
- * `users/{uid}/images/{id}` and return `fbstorage://` references. The
- * upload must succeed BEFORE the reference is returned — callers never
- * get a URL that doesn't point to a real uploaded file. This is the
- * "upload-then-link" pattern: the Firestore document that references
- * the image is only written after the upload completes.
+ *   │ signed-in? │ destination              │ ref returned │ cloud sync?
+ *   ├────────────┼──────────────────────────┼──────────────┼──────────────
+ *   │ yes        │ local IDB + sync queue   │ idb://       │ yes (outbox)
+ *   │ no         │ local IDB only           │ idb://       │ no
  *
- * If the upload fails (offline, network error, quota exceeded, etc.),
- * `upload()` throws an Error with a user-friendly message. The caller
- * is responsible for surfacing it — we do NOT silently fail.
+ * Always saves to local IDB first and returns an `idb://` ref
+ * immediately. The caller writes this ref into Firestore documents
+ * right away — no waiting for cloud upload. When signed-in, the bytes
+ * are also enqueued in `ImageSyncQueueService` for background cloud
+ * sync. Once the sync completes, an `image-mappings` doc is written so
+ * other devices can resolve the same `idb://` ref.
+ *
+ * Delete: removes the local IDB image immediately. If a mapping exists
+ * (image was previously synced to cloud), enqueues a cloud delete.
+ * Offline deletes are fine — the cloud delete queues in the outbox and
+ * flushes when reconnected.
  */
 @Injectable({ providedIn: 'root' })
 export class UploadService {
@@ -48,6 +57,8 @@ export class UploadService {
 
   private readonly storage = inject(FileStorageAdapter);
   private readonly fbStorage = inject(FirebaseStorageService);
+  private readonly mappings = inject(ImageMappingsService);
+  private readonly syncQueue = inject(ImageSyncQueueService);
   private readonly auth = inject(AuthService);
 
   /** Validate a file before upload. Returns `null` if valid, or an error message. */
@@ -62,11 +73,11 @@ export class UploadService {
   }
 
   /**
-   * Upload a single file. When signed in, goes to Firebase Storage;
-   * when signed out, goes to IndexedDB.
+   * Upload a single file. Always saves to local IDB and returns an
+   * `idb://` ref. When signed-in, also enqueues the bytes in the sync
+   * queue for background cloud upload.
    *
-   * @throws Error with a user-friendly message if validation or upload fails.
-   *   The error is surfaced to the user — we do NOT silently fail.
+   * @throws Error with a user-friendly message if validation fails.
    */
   async upload(file: File): Promise<UploadedFile> {
     const validationError = this.validate(file);
@@ -74,35 +85,27 @@ export class UploadService {
       throw new Error(validationError);
     }
 
-    // Auth-aware routing: Firebase Storage when logged in, IDB when not.
-    if (this.fbStorage.available) {
-      try {
-        const result = await this.fbStorage.upload(file);
-        return {
-          url: result.ref,
-          stored: {
-            id: result.ref,
-            name: file.name,
-            mimeType: file.type,
-            size: file.size,
-          },
-          filename: file.name,
-          size: file.size,
-          mimetype: file.type,
-        };
-      } catch (err) {
-        // Surface the error — don't silently fall back to IDB. The
-        // user needs to know the cloud upload failed so they can retry
-        // or check their connection.
-        const msg = err instanceof Error ? err.message : 'Cloud upload failed.';
-        throw new Error(`Image upload failed: ${msg}`, { cause: err });
-      }
-    }
-
-    // Logged out (or Firebase unavailable) — use local IndexedDB.
+    // Always save to local IDB first — this is the source of truth.
     const stored = await this.storage.save(file);
+    const localRef = `idb://${stored.id}`;
+
+    // When signed-in, enqueue for cloud sync. The sync queue flushes
+    // when online; offline uploads just wait in the queue.
+    if (this.auth.isAuthenticated()) {
+      const bytes = await file.arrayBuffer();
+      await this.syncQueue.enqueueUpload({
+        localId: stored.id,
+        bytes,
+        filename: file.name,
+        mime: file.type,
+      });
+    }
+    // Signed-out: just local. The existing sign-in merge flow asks the
+    // user about their local data; local images stay and the sync queue
+    // picks them up if the user chooses to sync.
+
     return {
-      url: `idb://${stored.id}`,
+      url: localRef,
       stored,
       filename: stored.name,
       size: stored.size,
@@ -117,33 +120,32 @@ export class UploadService {
 
   /**
    * Delete an uploaded image.
-   * If the URL is a Firebase Storage ref (`fbstorage://`), deletes it from Firebase.
-   * If the URL is an IndexedDB ref (`idb://`), deletes it from IndexedDB.
+   *   - Always deletes from local IDB immediately.
+   *   - Always enqueues a cloud delete. If the mapping is loaded, the
+   *     cloudPath is passed; if not, the sync queue looks it up at flush
+   *     time. If no mapping exists at flush time (image was never
+   *     synced), the delete is silently dropped.
+   *   - Cancels any pending upload for this local id (no point
+   *     uploading something we're about to delete).
    */
   async delete(url: string): Promise<void> {
     if (!url) return;
 
-    // Check if it is a Firebase Storage ref
-    const fbRef = parseFirebaseStorageRef(url);
-    if (fbRef && this.fbStorage.available) {
-      try {
-        await this.fbStorage.delete(url);
-      } catch (err) {
-        console.error('[UploadService] Failed to delete Firebase image:', url, err);
-      }
-      return;
-    }
-
-    // Check if it is an IndexedDB ref
     const idbRef = parseStoredFileRef(url);
-    if (idbRef) {
-      try {
-        await this.storage.delete({ id: idbRef.id, name: '', mimeType: '', size: 0 });
-      } catch (err) {
-        console.error('[UploadService] Failed to delete IndexedDB image:', url, err);
-      }
-      return;
+    if (!idbRef) return;
+
+    const localId = idbRef.id;
+
+    // Try to get cloudPath from in-memory map. If not loaded, pass
+    // undefined — the sync queue will look it up at flush time.
+    const cloudPath = this.mappings.getCloudPath(localId);
+    await this.syncQueue.enqueueDelete(localId, cloudPath);
+
+    // Always delete from local IDB.
+    try {
+      await this.storage.delete({ id: localId, name: '', mimeType: '', size: 0 });
+    } catch (err) {
+      console.error('[UploadService] Failed to delete local image:', url, err);
     }
   }
 }
-

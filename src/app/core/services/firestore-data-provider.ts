@@ -100,9 +100,16 @@ export class FirestoreDataProvider extends DataProvider {
    *  listeners when it changes. */
   private currentUid: string | null = null;
 
-  /** Bound online/offline event handlers (so we can remove them on dispose). */
-  private readonly onOnlineBound = (): void => this.recomputeSyncState();
-  private readonly onOfflineBound = (): void => this.recomputeSyncState();
+  /** Bound online/offline event handlers. Delegate to `FirebaseService`
+   *  which is the single source of truth for network state. */
+  private readonly onOnlineBound = (): void => {
+    void this.fb.setNetworkEnabled(true);
+    this.recomputeSyncState();
+  };
+  private readonly onOfflineBound = (): void => {
+    void this.fb.setNetworkEnabled(false);
+    this.recomputeSyncState();
+  };
 
   constructor() {
     super();
@@ -110,12 +117,16 @@ export class FirestoreDataProvider extends DataProvider {
       void this.dispose();
     });
 
-    // Listen to browser online/offline events. This is the most reliable
-    // signal for whether the user has a network connection — far more
-    // reliable than Firestore's `fromCache` flag, which is true for the
-    // initial snapshot before the server responds (even on a healthy
-    // connection) and stays true for empty collections that never
-    // trigger a server round-trip.
+    // Listen to browser online/offline events. When offline, call
+    // `disableNetwork()` so the Firestore SDK stops retrying the write
+    // stream (which spams "transport errored" warnings and makes
+    // `setDoc()` promises hang). With network disabled, writes commit
+    // to the local IndexedDB cache immediately and the promise resolves.
+    //
+    // Initial offline state is handled by `FirebaseService` (which calls
+    // `disableNetwork()` immediately after Firestore init, before any
+    // onSnapshot listener can attach). `FirebaseService` is the single
+    // source of truth for the `networkDisabled` flag.
     if (typeof window !== 'undefined') {
       window.addEventListener('online', this.onOnlineBound);
       window.addEventListener('offline', this.onOfflineBound);
@@ -220,6 +231,8 @@ export class FirestoreDataProvider extends DataProvider {
       window.removeEventListener('online', this.onOnlineBound);
       window.removeEventListener('offline', this.onOfflineBound);
     }
+    // Re-enable the network so the next user starts with a clean state.
+    void this.fb.setNetworkEnabled(true);
     this._syncState.set('synced');
     return Promise.resolve();
   }

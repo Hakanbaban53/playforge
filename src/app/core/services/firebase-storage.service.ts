@@ -1,8 +1,7 @@
-import { Injectable, inject, effect } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   ref,
   uploadBytes,
-  getDownloadURL,
   deleteObject,
   getBytes,
 } from 'firebase/storage';
@@ -10,24 +9,27 @@ import { FirebaseService } from './firebase.service';
 import { AuthService } from './auth.service';
 
 /**
- * Firebase Storage image service.
+ * Firebase Storage image service — cloud-only operations.
  *
- * Uploads image blobs to Firebase Storage under `users/{uid}/images/{id}`
- * and returns stable references that survive page reloads and sync across
- * devices. Used by `UploadService` when the user is signed in.
+ * Local-first principle: this service is ONLY called by
+ * `ImageSyncQueueService` (the outbox). It performs raw cloud
+ * operations (upload, delete, fetch bytes). It does NOT resolve refs
+ * for the UI — that's `ImageResolverService`'s job, which goes through
+ * local IDB first, then mapping, then cloud.
  *
- * URL scheme: `fbstorage://{path}` — a pseudo-URL that the
- * `ImageResolverService` resolves to a real HTTPS download URL via
- * `getDownloadURL()`. The download URL is time-limited (Firebase tokens
- * expire after ~1 hour), so we cache it and refresh on demand.
+ * Upload returns a `cloudPath` (the Storage path), NOT a `fbstorage://`
+ * ref. The caller (`ImageSyncQueueService`) writes this path to the
+ * `image-mappings` collection. Documents never see cloud paths.
  *
- * Cache invalidation: the in-memory `urlCache` is cleared on every
- * logout (driven by `AuthService.logoutEpoch`) so a stale URL from one
- * user's session is never reused after a different user logs in on the
- * same device.
+ * Offline fast-fail: `upload()` throws `'offline'` immediately when
+ * `navigator.onLine` is false. Storage has no offline queue — calling
+ * `uploadBytes()` offline makes the SDK retry the POST with exponential
+ * backoff, flooding the console with `ERR_INTERNET_DISCONNECTED` errors.
+ * The sync queue only flushes when online, so this is a defensive guard.
  */
 
-/** Prefix for Firebase Storage pseudo-URLs stored in catalog/invoice data. */
+/** Prefix for Firebase Storage pseudo-URLs (kept for backward compat
+ *  with any old `fbstorage://` refs in existing data). */
 export const FB_STORAGE_PREFIX = 'fbstorage://';
 
 /** Parse a `fbstorage://{path}` URL into its Storage path. */
@@ -41,105 +43,86 @@ export function buildFirebaseStorageRef(path: string): string {
   return `${FB_STORAGE_PREFIX}${path}`;
 }
 
+export interface CloudUploadResult {
+  /** The Storage path, e.g. `users/{uid}/images/img-123.jpeg`. */
+  cloudPath: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FirebaseStorageService {
   private readonly fb = inject(FirebaseService);
   private readonly auth = inject(AuthService);
 
-  /** Download URL cache: Storage path → HTTPS URL. */
-  private readonly urlCache = new Map<string, string>();
-
-  constructor() {
-    effect(() => {
-      const epoch = this.auth.logoutEpoch();
-      if (epoch === 0) return;
-      this.urlCache.clear();
-    });
-  }
-
-  /** Upload a file to Firebase Storage. Returns a stable `fbstorage://`
-   *  reference that can be stored in Firestore documents.
-   *  @throws Error if not signed in, Firebase unavailable, or upload fails. */
-  async upload(file: File): Promise<{ ref: string; downloadUrl: string }> {
+  /** Upload a file to Firebase Storage. Returns the cloud path.
+   *
+   *  INVARIANT: each `upload()` call generates a unique storage path
+   *  (via `Date.now()` + `Math.random()`). This is what makes
+   *  path-only mapping safe — no two uploads ever collide.
+   *
+   *  @throws Error if not signed in, Firebase unavailable, offline,
+   *  or upload fails. */
+  async upload(file: File): Promise<CloudUploadResult> {
     const storage = this.fb.storage;
     const uid = this.auth.user()?.uid;
     if (!storage || !uid) {
       throw new Error('Not signed in — cannot upload to cloud storage.');
     }
 
+    // Defensive fast-fail when offline. The sync queue should only
+    // flush when online, but this catches direct callers.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('offline');
+    }
+
     const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
     const imageId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const path = `users/${uid}/images/${imageId}.${ext}`;
-    const storageRef = ref(storage, path);
+    const cloudPath = `users/${uid}/images/${imageId}.${ext}`;
+    const storageRef = ref(storage, cloudPath);
 
     await uploadBytes(storageRef, file, { contentType: file.type });
 
-    const downloadUrl = await getDownloadURL(storageRef);
-    const refStr = buildFirebaseStorageRef(path);
-    this.urlCache.set(path, downloadUrl);
-
-    return { ref: refStr, downloadUrl };
+    return { cloudPath };
   }
 
-  /** Resolve a `fbstorage://{path}` reference to a usable HTTPS URL.
-   *  Caches the result and refreshes on error (token expiry). */
-  async resolveUrl(refUrl: string): Promise<string> {
-    const parsed = parseFirebaseStorageRef(refUrl);
-    if (!parsed) return refUrl;
-
-    const cached = this.urlCache.get(parsed.path);
-    if (cached) return cached;
-
-    const storage = this.fb.storage;
-    if (!storage) return '';
-
-    try {
-      const downloadUrl = await getDownloadURL(ref(storage, parsed.path));
-      this.urlCache.set(parsed.path, downloadUrl);
-      return downloadUrl;
-    } catch (err) {
-      console.error('[FirebaseStorage] Failed to get download URL:', err);
-      return '';
-    }
-  }
-
-  /** Delete a file from Firebase Storage by its `fbstorage://` reference. */
-  async delete(refUrl: string): Promise<void> {
-    const parsed = parseFirebaseStorageRef(refUrl);
-    if (!parsed) return;
-
+  /** Delete a file from Firebase Storage by its cloud path. */
+  async deleteByPath(cloudPath: string): Promise<void> {
     const storage = this.fb.storage;
     if (!storage) return;
 
+    // Defensive fast-fail when offline. The sync queue should only
+    // flush when online, but this catches direct callers.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('offline');
+    }
+
     try {
-      await deleteObject(ref(storage, parsed.path));
-      this.urlCache.delete(parsed.path);
+      await deleteObject(ref(storage, cloudPath));
     } catch (err) {
-      console.error('[FirebaseStorage] Delete failed:', err);
+      // `object-not-found` is fine — the image was already deleted
+      // (e.g. user deleted from another device). Don't surface as error.
+      const code = (err as { code?: string }).code ?? '';
+      if (code !== 'storage/object-not-found') {
+        throw err;
+      }
     }
   }
 
-  /** Download the raw bytes of a Firebase Storage file via the SDK.
+  /** Download the raw bytes of a Storage file by its cloud path.
+   *  Used by `ImageResolverService` to fetch cloud images for local
+   *  refs that aren't in the IDB cache (cross-device scenario).
    *
    *  Uses XHR under the hood, which IS subject to CORS. The Firebase
-   *  Storage bucket MUST have CORS configured for this to work from a
-   *  browser. See `cors.json` in the project root and apply with:
+   *  Storage bucket MUST have CORS configured. See `cors.json`.
    *
-   *    gsutil cors set cors.json gs://YOUR_BUCKET.appspot.com
-   *
-   *  @param refUrl A `fbstorage://{path}` reference.
    *  @returns The file contents as an ArrayBuffer, or null on failure. */
-  async getBytes(refUrl: string): Promise<ArrayBuffer | null> {
-    const parsed = parseFirebaseStorageRef(refUrl);
-    if (!parsed) return null;
-
+  async getBytes(cloudPath: string): Promise<ArrayBuffer | null> {
     const storage = this.fb.storage;
     if (!storage) return null;
 
     try {
-      return await getBytes(ref(storage, parsed.path), 10 * 1024 * 1024);
+      return await getBytes(ref(storage, cloudPath), 10 * 1024 * 1024);
     } catch (err) {
-      console.warn('[FirebaseStorage] getBytes failed (CORS?) for', refUrl, err);
+      console.warn('[FirebaseStorage] getBytes failed for', cloudPath, err);
       return null;
     }
   }

@@ -1,14 +1,14 @@
 <section class="page">
   <header class="page__head">
-    <div>
       <h1>{{ 'catalogMgmt.title' | translate }}</h1>
       <p class="muted">{{ 'catalogMgmt.subtitle' | translate }}</p>
-    </div>
+  </header>
+  <div class="head-actions">
     <app-button variant="primary" size="md" (click)="startAddFamily()">
       <app-icon name="add" [size]="14" />
       {{ 'catalogMgmt.addFamily' | translate }}
     </app-button>
-  </header>
+  </div>
 
   @if (error()) {
     <div class="alert alert--error">

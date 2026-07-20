@@ -1,20 +1,18 @@
 <section class="page">
   <header class="page__head">
-    <div>
       <h1>{{ 'receipt.title' | translate }}</h1>
       <p class="muted">{{ 'receipt.subtitle' | translate }}</p>
-    </div>
-    <div class="head-actions">
-      <app-button variant="ghost" size="md" (click)="goBack()">
-        <app-icon name="arrow_back" [size]="14" />
-        {{ 'common.back' | translate }}
-      </app-button>
-      <app-button variant="secondary" size="md" (click)="resetLayout()">
-        <app-icon name="restart_alt" [size]="14" />
-        {{ 'receipt.resetLayout' | translate }}
-      </app-button>
-    </div>
   </header>
+  <div class="head-actions">
+    <app-button variant="ghost" size="md" (click)="goBack()">
+      <app-icon name="arrow_back" [size]="14" />
+      {{ 'common.back' | translate }}
+    </app-button>
+    <app-button variant="secondary" size="md" (click)="resetLayout()">
+      <app-icon name="restart_alt" [size]="14" />
+      {{ 'receipt.resetLayout' | translate }}
+    </app-button>
+  </div>
 
   <!-- Add element toolbar -->
   <div class="add-toolbar surface-card">
@@ -116,6 +114,7 @@
               <label class="e-field">
                 <span>{{ el.type === 'image' ? ('receipt.imageSources' | translate) : ('receipt.textContent' | translate) }}</span>
                 <textarea
+                  class="input"
                   rows="4"
                   [value]="el.content || ''"
                   (input)="updateContent(el.id, $event)"
@@ -169,6 +168,7 @@
                     >−</button>
                     <input
                       type="text"
+                      class="input"
                       [value]="getStyle(el, 'fontSize', el.type === 'header' ? '20px' : '14px')"
                       (input)="updateStyle(el.id, 'fontSize', $event)"
                     />
@@ -183,7 +183,7 @@
 
                 <label class="e-field">
                   <span>{{ 'receipt.fontWeight' | translate }}</span>
-                  <select [value]="getStyle(el, 'fontWeight', '400')" (change)="updateStyle(el.id, 'fontWeight', $event)">
+                  <select class="input" [value]="getStyle(el, 'fontWeight', '400')" (change)="updateStyle(el.id, 'fontWeight', $event)">
                     @for (w of textWeights; track w.value) {
                       <option [value]="w.value">{{ w.key | translate }}</option>
                     }
@@ -192,7 +192,7 @@
 
                 <label class="e-field">
                   <span>{{ 'receipt.textAlign' | translate }}</span>
-                  <select [value]="getStyle(el, 'textAlign', 'left')" (change)="updateStyle(el.id, 'textAlign', $event)">
+                  <select class="input" [value]="getStyle(el, 'textAlign', 'left')" (change)="updateStyle(el.id, 'textAlign', $event)">
                     @for (a of textAlignments; track a.value) {
                       <option [value]="a.value">{{ a.key | translate }}</option>
                     }
@@ -212,6 +212,7 @@
                   <span>{{ 'receipt.lineHeight' | translate }}</span>
                   <input
                     type="text"
+                    class="input"
                     [value]="getStyle(el, 'lineHeight', '1.4')"
                     (input)="updateStyle(el.id, 'lineHeight', $event)"
                   />
@@ -241,7 +242,7 @@
               <div class="e-styles">
                 <label class="e-field">
                   <span>{{ 'receipt.imageFit' | translate }}</span>
-                  <select [value]="getStyle(el, 'imageFit', 'contain')" (change)="updateStyle(el.id, 'imageFit', $event)">
+                  <select class="input" [value]="getStyle(el, 'imageFit', 'contain')" (change)="updateStyle(el.id, 'imageFit', $event)">
                     @for (f of imageFits; track f.value) {
                       <option [value]="f.value">{{ f.key | translate }}</option>
                     }
@@ -250,7 +251,7 @@
 
                 <label class="e-field">
                   <span>{{ 'receipt.imageWidth' | translate }}</span>
-                  <select [value]="getStyle(el, 'imageWidth', '100%')" (change)="updateStyle(el.id, 'imageWidth', $event)">
+                  <select class="input" [value]="getStyle(el, 'imageWidth', '100%')" (change)="updateStyle(el.id, 'imageWidth', $event)">
                     <option value="100%">{{ 'receipt.widthFull' | translate }}</option>
                     <option value="75%">{{ 'receipt.width75' | translate }}</option>
                     <option value="50%">{{ 'receipt.width50' | translate }}</option>
@@ -266,7 +267,7 @@
 
                 <label class="e-field">
                   <span>{{ 'receipt.imageHeight' | translate }}</span>
-                  <select [value]="getStyle(el, 'imageHeight', '200px')" (change)="updateStyle(el.id, 'imageHeight', $event)">
+                  <select class="input" [value]="getStyle(el, 'imageHeight', '200px')" (change)="updateStyle(el.id, 'imageHeight', $event)">
                     <option value="100px">100px</option>
                     <option value="150px">150px</option>
                     <option value="200px">200px</option>
@@ -279,7 +280,7 @@
 
                 <label class="e-field">
                   <span>{{ 'receipt.imageRadius' | translate }}</span>
-                  <select [value]="getStyle(el, 'imageRadius', '0px')" (change)="updateStyle(el.id, 'imageRadius', $event)">
+                  <select class="input" [value]="getStyle(el, 'imageRadius', '0px')" (change)="updateStyle(el.id, 'imageRadius', $event)">
                     <option value="0px">{{ 'receipt.radiusNone' | translate }}</option>
                     <option value="4px">4px</option>
                     <option value="8px">8px</option>
@@ -291,7 +292,7 @@
 
                 <label class="e-field">
                   <span>{{ 'receipt.imagePerRow' | translate }}</span>
-                  <select [value]="getStyle(el, 'imagePerRow', el.type === 'visuals' ? '3' : '1')" (change)="updateStyle(el.id, 'imagePerRow', $event)">
+                  <select class="input" [value]="getStyle(el, 'imagePerRow', el.type === 'visuals' ? '3' : '1')" (change)="updateStyle(el.id, 'imagePerRow', $event)">
                     @for (n of imagePerRowOptions; track n) {
                       <option [value]="n">{{ n }}</option>
                     }

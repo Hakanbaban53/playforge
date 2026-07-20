@@ -1,16 +1,15 @@
 <section class="page">
   <header class="page__head">
-    <div>
       <h1>
         {{ 'invoice.title' | translate }}
-        <span class="doc-badge" [class.doc-badge--quote]="active().meta.docType === 'quote'">
+        <span class="badge" [class.badge--warn]="active().meta.docType === 'quote'" [class.badge--brand]="active().meta.docType !== 'quote'">
           {{ (active().meta.docType === 'quote' ? 'quote.quote' : 'quote.invoice') | translate }}
         </span>
       </h1>
       <p class="muted">
         {{ 'invoice.subtitle' | translate }}
       </p>
-    </div>
+    </header>
     <div class="head-actions">
       @if (active().meta.docType === 'quote') {
         <app-button variant="secondary" size="md" (click)="convertToInvoice()">
@@ -41,7 +40,6 @@
         {{ 'invoice.downloadPdf' | translate }}
       </app-button>
     </div>
-  </header>
 
   @if (lastPageCount()) {
     <div class="pdf-info">
@@ -221,7 +219,7 @@
                     <input
                       type="number"
                       min="1"
-                      class="ctrl__input ctrl__input--qty"
+                      class="input ctrl__input ctrl__input--qty"
                       [value]="line.quantity"
                       (input)="updateLineQty(line.id, $event)"
                     />
@@ -231,7 +229,7 @@
                     <span class="ctrl__label">{{ 'discount.label' | translate }}</span>
                     <div class="ctrl__discount">
                       <select
-                        class="ctrl__select"
+                        class="input ctrl__select"
                         [value]="line.discount?.type ?? 'none'"
                         (change)="updateDiscountType(line.id, $event)"
                       >
@@ -244,7 +242,7 @@
                           type="number"
                           min="0"
                           step="0.01"
-                          class="ctrl__input ctrl__input--discount"
+                          class="input ctrl__input ctrl__input--discount"
                           [value]="line.discount.value"
                           (input)="updateDiscountValue(line.id, $event)"
                           [attr.aria-label]="'discount.value' | translate"
@@ -294,13 +292,13 @@
                 </label>
                 <input
                   type="text"
-                  class="tax-item__name"
+                  class="input tax-item__name"
                   [value]="tax.name"
                   (input)="updateTaxName(tax.id, $event)"
                   [placeholder]="'invoice.taxName' | translate"
                 />
                 <select
-                  class="tax-item__type"
+                  class="input tax-item__type"
                   [value]="tax.type"
                   (change)="updateTaxType(tax.id, $event)"
                 >
@@ -309,7 +307,7 @@
                 </select>
                 <input
                   type="number"
-                  class="tax-item__value"
+                  class="input tax-item__value"
                   [value]="tax.value"
                   (input)="updateTaxValue(tax.id, $event)"
                   min="0"
@@ -335,7 +333,7 @@
       <section class="surface-card card">
         <h3 class="card__title">{{ 'invoice.notes' | translate }}</h3>
         <textarea
-          class="notes-input"
+          class="input notes-input"
           rows="3"
           [value]="active().meta.notes"
           (input)="updateMeta($event, 'notes')"

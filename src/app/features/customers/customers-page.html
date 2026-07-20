@@ -1,16 +1,14 @@
 <section class="page">
   <header class="page__head">
-    <div>
       <h1>{{ 'customers.title' | translate }}</h1>
       <p class="muted">{{ 'customers.subtitle' | translate }}</p>
-    </div>
-    <div class="head-actions">
-      <app-button variant="primary" size="md" (click)="startCreate()" [disabled]="isCreating()">
-        <app-icon name="add" [size]="14" />
-        {{ 'customers.add' | translate }}
-      </app-button>
-    </div>
   </header>
+  <div class="head-actions">
+    <app-button variant="primary" size="md" (click)="startCreate()" [disabled]="isCreating()">
+      <app-icon name="add" [size]="14" />
+      {{ 'customers.add' | translate }}
+    </app-button>
+  </div>
 
   <div class="layout">
     <!-- ===================== Customers (left) ===================== -->

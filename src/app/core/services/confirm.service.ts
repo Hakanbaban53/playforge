@@ -154,7 +154,6 @@ export class ConfirmService {
         font-weight: 700;
         line-height: 1.2;
         color: var(--text-strong);
-        letter-spacing: -0.01em;
       }
       .app-confirm__message {
         margin: 0;

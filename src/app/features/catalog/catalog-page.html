@@ -1,21 +1,19 @@
 <section class="page">
   <header class="page__head">
-    <div>
       <h1>{{ 'catalog.title' | translate }}</h1>
       <p class="muted">{{ 'catalog.subtitle' | translate }}</p>
-    </div>
-
-    <div class="page__head-search">
-      <app-icon name="search" [size]="18" />
-      <input
-        type="search"
-        [placeholder]="'catalog.searchPlaceholder' | translate"
-        [value]="search()"
-        (input)="onSearchInput($event)"
-        [attr.aria-label]="'common.search' | translate"
-      />
-    </div>
   </header>
+
+  <div class="page__head-search">
+    <app-icon name="search" [size]="18" />
+    <input
+      type="search"
+      [placeholder]="'catalog.searchPlaceholder' | translate"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+      [attr.aria-label]="'common.search' | translate"
+    />
+  </div>
 
   @if (isEmpty()) {
     <div class="empty-catalog surface-card">

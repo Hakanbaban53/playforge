@@ -98,10 +98,8 @@
   --ease-spring:     cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out-quint:  cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Continuous iteration tokens — single source of truth for spinners and
-     pulses so individual components stop hard-coding their own durations. */
-  --motion-spin: 900ms linear infinite;
-  --motion-pulse: 1.8s ease-in-out infinite;
+  --motion-spin: spin 900ms linear infinite;
+  --motion-pulse: pulse-soft 1.8s ease-in-out infinite;
 
   --app-max-width: 1480px;
   --app-max-width-narrow: 1100px;
@@ -280,7 +278,6 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.5;
   color: var(--text-base);
   background: var(--app-bg);
   -webkit-font-smoothing: antialiased;
@@ -292,7 +289,6 @@ h1, h2, h3, h4, h5 {
   margin: 0;
   color: var(--text-strong);
   font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
 p { margin: 0; }
@@ -351,7 +347,6 @@ input, select, textarea {
 }
 
 .muted { color: var(--text-muted); }
-.subtle { color: var(--text-subtle); }
 .mono { font-family: var(--font-mono); }
 
 /* ---- Enter animations (CSS only, no Angular Animations) ---- */
@@ -359,17 +354,9 @@ input, select, textarea {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
-}
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
 }
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
@@ -383,10 +370,6 @@ input, select, textarea {
 @keyframes fade-out {
   from { opacity: 1; transform: translateY(0); }
   to   { opacity: 0; transform: translateY(-4px); }
-}
-@keyframes slide-out-right {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(24px); }
 }
 @keyframes scale-out {
   from { opacity: 1; transform: scale(1); }
@@ -402,9 +385,7 @@ input, select, textarea {
 }
 
 .anim-fade-in   { animation: fade-in var(--motion-base) both; }
-.anim-slide-in  { animation: slide-in-right var(--motion-base) both; }
 .anim-scale-in  { animation: scale-in var(--motion-base) both; }
-.anim-fade-out  { animation: fade-out var(--motion-base) var(--ease-accelerate) both; }
 .anim-spin      { animation: var(--motion-spin); }
 
 /* Staggered list items */
@@ -574,22 +555,13 @@ html.theme-transitioning *::after {
   &__head {
     margin-bottom: 22px;
 
-    h1 {
-      font-size: 26px;
-      letter-spacing: -0.02em;
-    }
 
-    p {
-      margin-top: 6px;
-      max-width: 600px;
-    }
+    @media (max-width: 768px) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
 
-    &--row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-      flex-wrap: wrap;
+      h1 { font-size: 22px; }
     }
   }
 }
@@ -603,14 +575,8 @@ html.theme-transitioning *::after {
   &__title {
     font-size: 14px;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
     color: var(--text-subtle);
     margin-bottom: 12px;
-
-    &--sm {
-      font-size: 13px;
-      margin-bottom: 8px;
-    }
 
     &--danger { color: var(--danger-500); }
   }
@@ -653,15 +619,12 @@ html.theme-transitioning *::after {
     gap: 6px;
   }
 
-  /* Compact variant: smaller, uppercase mini-labels above inputs.
-     Used by dense form grids like the catalog-management editor. */
   &--compact {
     font-size: 11px;
     font-weight: 600;
 
     span {
       text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
 
     input, select, textarea {
@@ -727,7 +690,6 @@ html.theme-transitioning *::after {
     font-size: 11px;
     color: var(--text-subtle);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     margin-top: 2px;
   }
 
@@ -765,6 +727,7 @@ html.theme-transitioning *::after {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
 /* ---- Action row (generic flex button group) ---- */
@@ -814,7 +777,6 @@ html.theme-transitioning *::after {
     font-size: 11px;
     color: var(--text-muted);
     margin-top: 2px;
-    line-height: 1.4;
   }
 
   &--active {
@@ -935,6 +897,142 @@ html.theme-transitioning *::after {
     &:focus {
       outline: none;
       background: var(--brand-50);
+    }
+  }
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 16px;
+
+  input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  &__slider {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-300);
+    border-radius: 999px;
+    transition: background var(--motion-fast);
+    cursor: pointer;
+
+    &::before {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      left: 2px;
+      top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform var(--motion-fast);
+    }
+  }
+
+  input:checked + .toggle__slider {
+    background: var(--brand-500);
+    &::before { transform: translateX(14px); }
+  }
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  vertical-align: middle;
+
+  &--brand {
+    background: var(--brand-50);
+    color: var(--brand-700);
+  }
+
+  &--warn {
+    background: var(--warn-50);
+    color: var(--warn-500);
+  }
+
+  &--success {
+    background: var(--success-50);
+    color: var(--success-500);
+    box-shadow: 0 0 0 1px var(--success-500);
+  }
+
+  &--info {
+    background: var(--info-50);
+    color: var(--info-500);
+    box-shadow: 0 0 0 1px var(--info-500);
+  }
+
+  &--danger {
+    background: var(--danger-50);
+    color: var(--danger-700);
+    box-shadow: 0 0 0 1px var(--danger-500);
+  }
+
+  &--sm {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: none;
+    background: var(--brand-50);
+    color: var(--brand-700);
+    box-shadow: 0 0 0 1px var(--brand-200);
+    font-weight: 600;
+  }
+}
+
+.input {
+  border: 1px solid var(--surface-300);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text-base);
+  background: var(--surface-0);
+  font-family: inherit;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast),
+              background-color var(--motion-fast);
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-400);
+    box-shadow: 0 0 0 3px var(--brand-focus-ring);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+textarea.input { resize: vertical; }
+
+.icon-btn-spacer {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--text-subtle);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .actions--stretch-mobile,
+  .head-actions--stretch-mobile,
+  .form-actions--stretch-mobile {
+    ::ng-deep app-button {
+      flex: 1;
+
+      .btn {
+        width: 100%;
+      }
     }
   }
 }

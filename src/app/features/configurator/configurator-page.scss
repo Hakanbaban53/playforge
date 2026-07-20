@@ -1,7 +1,5 @@
-.page {
-  &__head {
-    margin-bottom: 24px;
-  }
+.page__head {
+  margin-bottom: 24px;
 }
 
 .family-bar {
@@ -47,7 +45,6 @@
     font-size: 11px;
     color: var(--text-subtle);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
   }
 
   &__name {
@@ -110,7 +107,6 @@
   &__title {
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
     color: var(--text-subtle);
     margin-bottom: 8px;
     display: flex;
@@ -209,7 +205,6 @@
   &__required {
     font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     background: var(--surface-200);
     color: var(--text-muted);
     padding: 1px 6px;
@@ -346,16 +341,12 @@
 }
 
 .total-card {
-  /* Pairs with `.surface-card` (which supplies background / border / shadow /
-     radius but no padding). Use theme spacing tokens so this panel matches
-     the spacing scale used across the app rather than a one-off px value. */
   padding: var(--space-5) var(--space-6);
 
   h3 {
     font-size: 14px;
     margin-bottom: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
     color: var(--text-subtle);
   }
 }
@@ -454,10 +445,6 @@
 @media (max-width: 768px) {
   .page {
     padding: 16px 14px 32px;
-
-    &__head h1 {
-      font-size: 22px;
-    }
   }
 
   .family-bar {

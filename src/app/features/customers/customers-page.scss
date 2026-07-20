@@ -1,13 +1,3 @@
-.page {
-  &__head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-}
-
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -24,7 +14,6 @@
   &__title {
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
     color: var(--text-subtle);
     margin-bottom: 4px;
   }
@@ -116,7 +105,6 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--brand-50);
@@ -185,14 +173,6 @@
 @media (max-width: 768px) {
   .page {
     padding: 16px 14px 32px;
-
-    &__head {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-
-      h1 { font-size: 22px; }
-    }
   }
 
   .form-grid {

@@ -29,7 +29,6 @@
     [class.sidebar--mobile-closed]="isMobile() && !mobileDrawerOpen()"
   >
     <!-- Brand area with hover-to-reveal collapse toggle -->
-    <div class="sidebar__brand-wrapper">
       <div
         class="sidebar__brand"
         role="button"
@@ -55,7 +54,6 @@
           </div>
         }
       </div>
-    </div>
 
     <nav class="sidebar__nav">
       @for (item of navItems; track item.route) {
@@ -66,9 +64,7 @@
           [title]="showText() ? '' : (item.labelKey | translate)"
           (click)="closeMobileDrawer()"
         >
-          <span class="nav-item__icon">
-            <app-icon [name]="item.icon" [size]="20" />
-          </span>
+          <app-icon [name]="item.icon" [size]="20" />
           @if (showText()) {
             <span class="nav-item__label">
               <span class="nav-item__title">{{ item.labelKey | translate }}</span>

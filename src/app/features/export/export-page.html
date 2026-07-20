@@ -1,4 +1,4 @@
-<section class="page">
+<section class="page page--narrow">
   <header class="page__head">
     <h1>{{ 'export.title' | translate }}</h1>
     <p class="muted">{{ 'export.subtitle' | translate }}</p>
@@ -40,7 +40,7 @@
           }
         </div>
 
-        <div class="actions">
+        <div class="actions actions--stretch-mobile">
           <app-button variant="primary" size="md" (click)="doCatalogExport('xlsx')" [disabled]="exportCount() === 0">
             <app-icon name="download" [size]="14" />
             {{ 'export.exportXlsx' | translate }}
@@ -73,7 +73,7 @@
         </div>
       </div>
 
-      <div class="actions">
+      <div class="actions actions--stretch-mobile">
         <app-button variant="primary" size="md" (click)="doInvoiceExport('xlsx')">
           <app-icon name="download" [size]="14" />
           {{ 'export.exportXlsx' | translate }}
@@ -96,7 +96,7 @@
         </div>
       </div>
 
-      <div class="actions">
+      <div class="actions actions--stretch-mobile">
         <app-button variant="primary" size="md" (click)="doCustomerExport('xlsx')">
           <app-icon name="download" [size]="14" />
           {{ 'export.exportXlsx' | translate }}
@@ -119,7 +119,7 @@
         </div>
       </div>
 
-      <div class="actions">
+      <div class="actions actions--stretch-mobile">
         <app-button variant="primary" size="md" (click)="doSettingsExport()">
           <app-icon name="download" [size]="14" />
           {{ 'export.exportJson' | translate }}

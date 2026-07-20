@@ -191,7 +191,6 @@ type CallbackStatus =
       font-size: 17px;
       font-weight: 700;
       color: var(--text-strong);
-      letter-spacing: -0.01em;
     }
 
     .oauth-card__brand-tag {
@@ -246,7 +245,6 @@ type CallbackStatus =
       font-weight: 700;
       color: var(--text-strong);
       margin: 0;
-      letter-spacing: -0.01em;
     }
 
     .oauth-state__body {

@@ -1,4 +1,4 @@
-<section class="page">
+<section class="page page--narrow">
   <header class="page__head">
     <h1>{{ 'settings.title' | translate }}</h1>
     <p class="muted">{{ 'settings.subtitle' | translate }}</p>
@@ -172,7 +172,7 @@
               <td class="rate-table__code">
                 <strong>{{ code }}</strong>
                 @if (code === baseCurrency()) {
-                  <span class="badge">{{ 'settings.baseCurrency' | translate }}</span>
+                  <span class="badge badge--sm">{{ 'settings.baseCurrency' | translate }}</span>
                 }
               </td>
               <td>
@@ -181,7 +181,7 @@
                 } @else {
                   <input
                     type="number"
-                    class="rate-input"
+                    class="input rate-input"
                     step="0.0001"
                     min="0"
                     [value]="rateFor(code)"

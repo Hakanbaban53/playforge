@@ -220,7 +220,7 @@ import {
       font-size: 11px;
       color: #6b7782;
     }
-    .r-meta__heading { font-size: 22px; font-weight: 700; color: #0f6638; letter-spacing: 0.08em; margin-bottom: 4px; text-align: right; }
+    .r-meta__heading { font-size: 22px; font-weight: 700; color: #0f6638; margin-bottom: 4px; text-align: right; }
     .r-meta__num { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4b5560; text-align: right; }
     .r-meta__date { margin-top: 2px; text-align: right; }
     .r-billto {
@@ -229,14 +229,14 @@ import {
       padding: 10px 12px;
       margin-top: 10px;
     }
-    .r-billto__label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7782; }
+    .r-billto__label { font-size: 9px; text-transform: uppercase; color: #6b7782; }
     .r-billto__name { font-weight: 700; font-size: 13px; margin-top: 2px; }
     .r-billto__line { font-size: 11px; color: #4b5560; margin-top: 1px; }
     .r-billto__addr { font-family: inherit; font-size: 11px; margin: 4px 0 0; white-space: pre-wrap; color: #6b7782; }
 
     .r-table { width: 100%; border-collapse: collapse; break-inside: avoid; page-break-inside: avoid; table-layout: fixed; }
     .r-table th, .r-table td { padding: 8px 10px; border-bottom: 1px solid #e6ebef; text-align: left; font-size: 11px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
-    .r-table th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7782; background: #f8fafb; }
+    .r-table th { font-size: 9px; text-transform: uppercase; color: #6b7782; background: #f8fafb; }
     .r-table__num { text-align: right; }
     .r-table__qty { width: 10%; }
     .r-table__price { width: 18%; }

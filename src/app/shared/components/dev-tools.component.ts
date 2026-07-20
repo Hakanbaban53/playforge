@@ -145,7 +145,6 @@ import { IconComponent } from './icon.component';
       color: var(--text-base);
       font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.06em;
       cursor: pointer;
       box-shadow: var(--shadow-md);
       transition: transform var(--motion-fast), box-shadow var(--motion-fast),
@@ -216,7 +215,6 @@ import { IconComponent } from './icon.component';
       font-size: 12px;
       font-weight: 700;
       color: var(--text-strong);
-      letter-spacing: 0.04em;
       text-transform: uppercase;
 
       app-icon {
@@ -276,7 +274,6 @@ import { IconComponent } from './icon.component';
         font-size: 9px;
         color: var(--text-subtle);
         text-transform: uppercase;
-        letter-spacing: 0.04em;
         line-height: 1.1;
       }
     }

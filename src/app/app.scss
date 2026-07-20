@@ -57,7 +57,6 @@
     font-weight: 700;
     font-size: 16px;
     color: var(--text-strong);
-    letter-spacing: -0.01em;
   }
 
   &__badge {
@@ -109,6 +108,26 @@
     align-items: center;
     gap: 12px;
     cursor: pointer;
+
+    &:hover {
+      .brand-mark__default {
+        opacity: 0;
+      }
+      .brand-mark__hover {
+        opacity: 1;
+      }
+    }
+
+    @media (hover: none) {
+      &:hover {
+        .brand-mark__default {
+          opacity: 1;
+        }
+        .brand-mark__hover {
+          opacity: 0;
+        }
+      }
+    }
   }
 
   &__nav {
@@ -159,9 +178,8 @@
 }
 
 .brand-mark {
-  width: 40px;
-  height: 40px;
   border-radius: 12px;
+  padding: 12px;
   background: linear-gradient(135deg, var(--brand-400), var(--brand-600));
   display: grid;
   place-items: center;
@@ -187,32 +205,11 @@
   }
 }
 
-/* Desktop: hover on brand-wrapper swaps the icon */
-.sidebar__brand-wrapper:hover .brand-mark__default {
-  opacity: 0;
-}
-.sidebar__brand-wrapper:hover .brand-mark__hover {
-  opacity: 1;
-}
-
-/* Touch devices: always show default icon (no hover available) */
-@media (hover: none) {
-  .sidebar__brand-wrapper:hover .brand-mark__default {
-    opacity: 1;
-  }
-  .sidebar__brand-wrapper:hover .brand-mark__hover {
-    opacity: 0;
-  }
-}
-
 .brand-text {
   display: flex;
   flex-direction: column;
   line-height: 1.15;
   overflow: hidden;
-  /* Fade in when the sidebar expands / mobile drawer opens. The @if in
-     app.html removes the element on collapse, so there's no exit
-     animation — the grid/drawer transition carries the visual instead. */
   animation: fade-in var(--motion-fast) both;
 }
 
@@ -220,14 +217,12 @@
   font-size: 16px;
   font-weight: 700;
   color: #fff;
-  letter-spacing: -0.01em;
 }
 
 .brand-sub {
   font-size: 11px;
   color: var(--sidebar-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   margin-top: 2px;
 }
 
@@ -235,7 +230,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: var(--radius-md);
   color: var(--sidebar-text-muted);
   text-decoration: none;
@@ -261,16 +256,6 @@
 
   &--active:hover {
     background: var(--sidebar-active-bg);
-    box-shadow: inset 0 0 0 1px var(--sidebar-active-border),
-                inset 0 0 0 2px rgba(255, 255, 255, 0.18);
-  }
-
-  &__icon {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
   }
 
   &__label {
@@ -305,30 +290,6 @@
     padding: 2px 7px;
     min-width: 18px;
     text-align: center;
-  }
-}
-
-/* Collapsed (desktop): center icons, hide everything else */
-.shell--collapsed .nav-item {
-  justify-content: center;
-  padding: 10px;
-
-  .nav-item__badge {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    font-size: 9px;
-    padding: 1px 4px;
-    min-width: 14px;
-  }
-}
-
-.shell--collapsed .sidebar {
-  padding: 20px 8px;
-
-  .sidebar__brand {
-    justify-content: center;
-    padding: 4px 0 22px;
   }
 }
 

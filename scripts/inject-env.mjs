@@ -20,7 +20,7 @@
  *   2. Run `node scripts/inject-env.mjs` before triggering `npm run build` or `npm run tauri:build`.
  */
 
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,7 +40,7 @@ const {
   FB_WEB_CLIENT_ID,
 } = process.env;
 
-const hasEnvVars = 
+const hasEnvVars = !!(
   FB_API_KEY || 
   FB_AUTH_DOMAIN || 
   FB_PROJECT_ID || 
@@ -48,17 +48,22 @@ const hasEnvVars =
   FB_MESSAGING_SENDER_ID || 
   FB_APP_ID || 
   FB_MEASUREMENT_ID ||
-  FB_WEB_CLIENT_ID;
+  FB_WEB_CLIENT_ID
+);
 
 // If we are running locally and environment.ts already exists,
-// don't overwrite it unless environment variables are provided.
-// This prevents wiping local developer keys.
+// don't overwrite it unless environment variables are provided, OR if it's missing the firebase block.
+// This prevents wiping local developer keys while ensuring we generate a valid config for builds.
 if (!hasEnvVars && existsSync(ENV_PATH)) {
-  console.log('[+] environment.ts already exists and no build env variables are defined. Keeping existing config.');
-  process.exit(0);
+  const content = readFileSync(ENV_PATH, 'utf8');
+  if (content.includes('firebase:')) {
+    console.log('[+] environment.ts already exists and has firebase config. Keeping existing config.');
+    process.exit(0);
+  }
+  console.log('[*] environment.ts exists but is missing firebase block. Generating safe default configuration...');
 }
 
-const enabled = FB_ENABLED === 'true' || (hasEnvVars && FB_ENABLED !== 'false');
+const enabled = FB_ENABLED === 'true' || !!(hasEnvVars && FB_ENABLED !== 'false');
 
 const envContent = `/**
  * App-wide environment values.

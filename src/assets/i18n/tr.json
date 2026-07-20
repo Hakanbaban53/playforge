@@ -3,7 +3,8 @@
     "name": "PlayForge",
     "subtitle": "Satış & Konfigüratör",
     "version": "Angular v22 · Zoneless",
-    "title": "PlayForge — Satış & Konfigüratör"
+    "title": "PlayForge — Satış & Konfigüratör",
+    "initializing": "PlayForge başlatılıyor..."
   },
   "nav": {
     "catalog": "Katalog",

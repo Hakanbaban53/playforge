@@ -10,6 +10,8 @@ import { AuthWidgetComponent } from './shared/components/auth-widget.component';
 import { FirstLoginMergeComponent } from './shared/components/first-login-merge.component';
 import { InvoiceService } from './core/services/invoice.service';
 import { UpdateService } from './core/services/update.service';
+import { AuthService } from './core/services/auth.service';
+import { SpinnerComponent } from './shared/components/spinner.component';
 import { environment } from '../environments/environment';
 
 interface NavItem {
@@ -49,6 +51,7 @@ interface NavItem {
     SyncIndicatorComponent,
     AuthWidgetComponent,
     FirstLoginMergeComponent,
+    SpinnerComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -56,6 +59,7 @@ interface NavItem {
 export class App {
   private readonly invoice = inject(InvoiceService);
   readonly updateService = inject(UpdateService);
+  readonly authService = inject(AuthService);
 
   protected readonly title = 'PlayForge';
   readonly version = environment.version;

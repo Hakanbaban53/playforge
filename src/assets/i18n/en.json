@@ -3,7 +3,8 @@
     "name": "PlayForge",
     "subtitle": "Sales & Configurator",
     "version": "Angular v22 · Zoneless",
-    "title": "PlayForge — Sales & Configurator"
+    "title": "PlayForge — Sales & Configurator",
+    "initializing": "Initializing PlayForge..."
   },
   "nav": {
     "catalog": "Catalog",

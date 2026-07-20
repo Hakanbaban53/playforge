@@ -314,3 +314,69 @@
     height: calc(100vh - 57px); /* subtract topbar height */
   }
 }
+
+/* ============================ Full-Screen Initial Loader ============================ */
+.app-initial-loader {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--app-bg);
+  z-index: 9999;
+  padding: var(--space-6);
+  box-sizing: border-box;
+
+  &__logo {
+    margin-bottom: var(--space-5);
+    animation: pulse-soft 2s ease-in-out infinite;
+
+    .brand-mark {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--brand-400), var(--brand-600));
+      display: grid;
+      place-items: center;
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(31, 157, 86, 0.35);
+    }
+  }
+
+  &__title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-strong);
+    margin-bottom: var(--space-2);
+    letter-spacing: -0.025em;
+  }
+
+  &__subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-8);
+  }
+
+  &__spinner-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: var(--surface-0);
+    border: 1px solid var(--surface-200);
+    border-radius: 999px;
+    box-shadow: var(--shadow-sm);
+    color: var(--brand-500);
+    transition: background var(--motion-base), border-color var(--motion-base);
+  }
+
+  &__text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+}

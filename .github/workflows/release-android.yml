@@ -2,6 +2,17 @@ name: "Release Android"
 on:
   workflow_dispatch:
 
+env:
+  FB_ENABLED: "true"
+  FB_API_KEY: ${{ secrets.FB_API_KEY }}
+  FB_AUTH_DOMAIN: ${{ secrets.FB_AUTH_DOMAIN }}
+  FB_PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
+  FB_STORAGE_BUCKET: ${{ secrets.FB_STORAGE_BUCKET }}
+  FB_MESSAGING_SENDER_ID: ${{ secrets.FB_MESSAGING_SENDER_ID }}
+  FB_APP_ID: ${{ secrets.FB_APP_ID }}
+  FB_MEASUREMENT_ID: ${{ secrets.FB_MEASUREMENT_ID }}
+  FB_WEB_CLIENT_ID: ${{ secrets.FB_WEB_CLIENT_ID }}
+
 jobs:
   build-android:
     name: Build Android APK
@@ -18,11 +29,6 @@ jobs:
         with:
           node-version: lts/*
           cache: "npm"
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
 
       - name: Install Rust stable and Android targets
         uses: dtolnay/rust-toolchain@stable
@@ -60,4 +66,35 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playforge-android-apks
-          path: src-tauri/gen/android/app/build/outputs/apk/debug/*.apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+      - name: Get Version
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare Package (Android)
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          # Find all apk files recursively under build/outputs/apk/
+          find src-tauri/gen/android/app/build/outputs/apk/ -name "*.apk" | while read -r f; do
+              name=$(basename "$f")
+              new_name=$(echo "$name" | sed "s/^app-/PlayForge_${VERSION}_/")
+              cp "$f" "$new_name"
+              echo "Prepared package: $new_name"
+          done
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: 'PlayForge v${{ steps.get_version.outputs.VERSION }}'
+          draft: true
+          prerelease: false
+          files: |
+            PlayForge_*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

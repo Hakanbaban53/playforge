@@ -60,7 +60,7 @@ jobs:
         env:
           NDK_HOME: ${{ env.NDK_HOME }}
         run: |
-          npm run tauri android build -- --debug --target aarch64 --target armv7
+          npm run tauri android build --debug --apk --split-per-abi
 
       - name: Upload Debug APK Artifacts
         uses: actions/upload-artifact@v4
